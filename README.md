@@ -8,19 +8,20 @@ Changes in this version:
 
 ## Compile instructions:
 
-1. Clone this repo and install dependencies
+1. Clone this repo (+ submodules) and install dependencies
 ```bash
-git clone https://github.com/matu6968/m5burner.git
+git clone --recurse-submodules https://github.com/matu6968/m5burner.git 
 cd m5burner
 yarn install
+pip install pyinstaller
 ```
 2. Recompile native dependencies
 ```bash
-yarn post-package
+yarn postpackage
 ```
 3. Test the app if it works
 ```bash
-electron app.js
+electron app.js # for that to work you need to globally add the package via yarn or npm
 ```
 If you are getting an error saying 
 ```bash
