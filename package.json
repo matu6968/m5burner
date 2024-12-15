@@ -1,0 +1,61 @@
+{
+  "name": "m5burner",
+  "version": "3.0.0",
+  "homepage": "https://docs.m5stack.com/en/download",
+  "description": "M5Stack Flash Tool",
+  "main": "app.js",
+  "author": "M5Stack",
+  "dependencies": {
+    "@electron/rebuild": "3.7.1",
+    "@electron/remote": "^2.0.8",
+    "axios": "^0.26.0",
+    "lzma-native": "^8.0.6",
+    "unzipper": "^0.10.11",
+    "usb-detection": "^4.14.2",
+    "usb-native": "^6.0.0"
+  },
+  "devDependencies": {
+    "electron-builder": "^24.3.0",
+    "electron": "31.7.6"
+  },
+  "scripts": {
+    "postpackage": "electron-rebuild",
+    "nvsbuild": "pyinstaller --onefile esp-idf-nvs-partition-gen/esp_idf_nvs_partition_gen/nvs_partition_gen.py && mv /dist/nvs_partition_gen nvs && cp dist/nvs .",
+    "rebuild": "echo rebuilding native dependencies... && npm rebuild",
+    "package": "node package.js"
+  },
+  "build": {
+    "appId": "com.m5stack.m5burner",
+    "productName": "M5Burner",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "app.js",
+      "node_modules/**/*",
+      "packages/**/*",
+      "package.json",
+      "mac-error-win.html",
+      "assets/m5.ico",
+      "assets/m5.png",
+      "assets/m5_64.ico",
+      "assets/m5.icns",
+      "assets/m5_1024.icns"     
+    ],
+    "win": {
+      "target": "zip",
+      "icon": "assets/m5.ico"
+    },
+    "linux": {
+      "target": ["zip"],
+      "icon": "assets/m5.png",
+      "category": "Utility"
+    },
+    "mac": {
+      "target": ["zip"],
+      "icon": "assets/m5.icns",
+      "category": "public.app-category.utilities"
+    }
+  }
+}
+
