@@ -1,0 +1,11 @@
+[Desktop Entry]
+Name=M5Burner
+Comment=Image flasher for M5Stack devices
+GenericName=ESP32 Flasher
+Exec=/usr/bin/M5Burner
+Icon=m5
+Type=Application
+StartupNotify=false
+StartupWMClass=M5Burner
+Categories=Utility
+Keywords=m5burner;
