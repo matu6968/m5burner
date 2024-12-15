@@ -6,7 +6,7 @@
   "main": "app.js",
   "author": "M5Stack",
   "dependencies": {
-    "@electron/rebuild": "3.7.1",
+    "@electron/rebuild": "^3.7.1",
     "@electron/remote": "^2.0.8",
     "axios": "^0.26.0",
     "lzma-native": "^8.0.6",
@@ -16,7 +16,7 @@
   },
   "devDependencies": {
     "electron-builder": "^24.3.0",
-    "electron": "31.7.6"
+    "electron": "^31.7.6"
   },
   "scripts": {
     "postpackage": "electron-rebuild",
