@@ -52,5 +52,5 @@ electron app.js # this should now launch the app
 yarn package
 ```
 ## License
-Everything but package.js has no license due to it being decompiled from the official [M5Burner Linux x64 app](https://docs.m5stack.com/en/download), while package.js is MIT licensed.
+Everything but package.js and other files (see LICENSE) belong to M5Stack due to it being decompiled from the official [M5Burner Linux x64 app](https://docs.m5stack.com/en/download), while package.js is MIT licensed.
 If M5Stack dosen't mind about decompilation of their app then it will be licensed under MIT too. 
