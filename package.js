@@ -3,7 +3,8 @@ const path = require('path');
 const { execSync } = require('child_process');
 
 // Define paths and constants
-const ARCH = process.arch; // Get architecture (e.g., arm64, x64)
+let ARCH = process.arch; // Get architecture (e.g., arm64, x64)
+if (ARCH === 'arm') ARCH = 'armv7l'; // Adjust for Electron Builder's naming convention for 32-bit ARM
 const BASE_FOLDER = `m5stack-${ARCH}`;
 const ELECTRON_BUILD_CMD = 'electron-builder';
 const PYINSTALLER_CMD = 'pyinstaller --onefile esp-idf-nvs-partition-gen/esp_idf_nvs_partition_gen/nvs_partition_gen.py --distpath esp-idf-nvs-partition-gen/esp_idf_nvs_partition_gen/dist';
