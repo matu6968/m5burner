@@ -1,6 +1,6 @@
 {
   "name": "m5burner",
-  "version": "3.0.0",
+  "version": "3.0.1",
   "homepage": "https://docs.m5stack.com/en/download",
   "description": "M5Stack Flash Tool",
   "main": "app.js",
@@ -8,21 +8,24 @@
   "dependencies": {
     "@electron/rebuild": "^3.7.1",
     "@electron/remote": "^2.0.8",
+    "@serialport/bindings-cpp": "^13.0.1",
     "axios": "^0.26.0",
+    "glob": "^11.0.1",
     "lzma-native": "^8.0.6",
+    "serialport": "^12.0.0",
     "unzipper": "^0.10.11",
-    "usb-detection": "^4.14.2",
-    "usb-native": "^6.0.0"
+    "usb": "^2.11.0"
   },
   "devDependencies": {
-    "electron-builder": "^24.3.0",
-    "electron": "^31.7.6"
+    "electron": "^34.0.0",
+    "electron-builder": "^24.3.0"
   },
   "scripts": {
     "postpackage": "electron-rebuild",
     "nvsbuild": "pyinstaller --onefile esp-idf-nvs-partition-gen/esp_idf_nvs_partition_gen/nvs_partition_gen.py && mv /dist/nvs_partition_gen nvs && cp dist/nvs .",
-    "rebuild": "echo rebuilding native dependencies... && npm rebuild",
-    "package": "node package.js"
+    "rebuild": "electron-rebuild -f -w usb,serialport,@serialport/bindings-cpp",
+    "package": "node package.js",
+    "run": "electron app.js"
   },
   "build": {
     "appId": "com.m5stack.m5burner",
@@ -40,22 +43,25 @@
       "assets/m5.png",
       "assets/m5_64.ico",
       "assets/m5.icns",
-      "assets/m5_1024.icns"     
+      "assets/m5_1024.icns"
     ],
     "win": {
       "target": "zip",
       "icon": "assets/m5.ico"
     },
     "linux": {
-      "target": ["zip"],
+      "target": [
+        "zip"
+      ],
       "icon": "assets/m5.png",
       "category": "Utility"
     },
     "mac": {
-      "target": ["zip"],
+      "target": [
+        "zip"
+      ],
       "icon": "assets/m5.icns",
       "category": "public.app-category.utilities"
     }
   }
 }
-

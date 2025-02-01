@@ -55,3 +55,33 @@ yarn package
 ## License
 Everything but package.js and other files (see LICENSE) belong to M5Stack due to it being decompiled from the official [M5Burner Linux x64 app](https://docs.m5stack.com/en/download), while package.js is MIT licensed.
 If M5Stack dosen't mind about decompilation of their app then it will be licensed under MIT too. 
+
+## USB Device Access Setup
+
+Due to the migration of the client to use the node-usb library, several system changes are required to use the new client depending on your system:
+
+### Linux
+Add the following udev rules to `/etc/udev/rules.d/99-usb-serial.rules`:
+
+# CP210x devices
+SUBSYSTEM=="usb", ATTRS{idVendor}=="10c4", ATTRS{idProduct}=="ea60", MODE="0666"
+# CH34x devices
+SUBSYSTEM=="usb", ATTRS{idVendor}=="1a86", ATTRS{idProduct}=="7523", MODE="0666"
+# FTDI devices
+SUBSYSTEM=="usb", ATTRS{idVendor}=="0403", MODE="0666"
+
+Then reload the rules:
+```bash
+sudo udevadm control --reload-rules
+sudo udevadm trigger
+```
+
+### Windows
+No additional setup required, but users need to have the appropriate USB-Serial drivers installed for the specific serial chipset on the device:
+CH340, CH341 drivers: https://www.wch-ic.com/downloads/CH341SER_EXE.html (most common on ESP based devices)
+CP2102 drivers: https://www.silabs.com/developers/usb-to-uart-bridge-vcp-drivers
+CH342, CH343, CH9102 drivers: https://www.wch.cn/downloads/CH343SER_ZIP.html
+FTDI drivers: https://ftdichip.com/drivers/vcp-drivers/
+
+### macOS
+No additional setup required.

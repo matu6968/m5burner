@@ -14,6 +14,7 @@ const { bindBurnerNVSEvents } = require('./nvs')
 const { bindFileDialogEvents } = require('./dialog')
 const { bindAutoWifiEvents } = require('./autoWiFi')
 const { bindDeviceEvents } = require('./device')
+const serial = require('./serialport/serial')
 
 const bindMinimizeEvent = () =>
   ipcMain.on(IPC_EVENT.IPC_MINIMIZE, (event, args) => {

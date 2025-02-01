@@ -5,10 +5,21 @@ const { execSync } = require('child_process');
 // Define paths and constants
 let ARCH = process.arch; // Get architecture (e.g., arm64, x64)
 if (ARCH === 'arm') ARCH = 'armv7l'; // Adjust for Electron Builder's naming convention for 32-bit ARM
+
+// Update the electron output path logic to handle x64 differently
+const getElectronOutput = () => {
+    // For x64 architecture, electron-builder uses just 'linux-unpacked'
+    if (ARCH === 'x64') {
+        return 'dist/linux-unpacked';
+    }
+    // For other architectures, it includes the arch in the path
+    return `dist/linux-${ARCH}-unpacked`;
+};
+
 const BASE_FOLDER = `m5stack-${ARCH}`;
 const ELECTRON_BUILD_CMD = 'electron-builder';
 const PYINSTALLER_CMD = 'pyinstaller --onefile esp-idf-nvs-partition-gen/esp_idf_nvs_partition_gen/nvs_partition_gen.py --distpath esp-idf-nvs-partition-gen/esp_idf_nvs_partition_gen/dist';
-const ELECTRON_OUTPUT = `dist/linux-${ARCH}-unpacked`;
+const ELECTRON_OUTPUT = getElectronOutput();
 const BUILD_DIR = path.resolve('deps_package');
 const OUTPUT_DIR = path.resolve(BASE_FOLDER);
 const BIN_DIR = path.join(OUTPUT_DIR, 'bin');

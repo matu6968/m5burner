@@ -1,7 +1,8 @@
 const { platform } = require('os')
 const fs = require('fs')
 const { promisify } = require('util')
-const { SerialPort } = require('usb-native')
+const usb = require('usb')
+const SerialPort = require('serialport')
 
 const readDirAsync = promisify(fs.readdir)
 
@@ -117,9 +118,82 @@ function reboot() {
   }
 }
 
+function findDevices() {
+    const devices = usb.getDeviceList();
+    return devices.filter(device => {
+        // Get device descriptor
+        const desc = device.deviceDescriptor;
+        
+        // Check if it's a USB-Serial device
+        // Common USB-Serial vendors/products:
+        // CP210x: VID=0x10C4, PID=0xEA60
+        // CH34x:  VID=0x1A86, PID=0x7523
+        // FTDI:   VID=0x0403, various PIDs
+        return (
+            (desc.idVendor === 0x10C4 && desc.idProduct === 0xEA60) || // CP210x
+            (desc.idVendor === 0x1A86 && desc.idProduct === 0x7523) || // CH34x
+            (desc.idVendor === 0x0403) // FTDI devices
+        );
+    }).map(device => {
+        const desc = device.deviceDescriptor;
+        return {
+            locationId: device.portNumbers.join('.'),
+            vendorId: desc.idVendor.toString(16).padStart(4, '0'),
+            productId: desc.idProduct.toString(16).padStart(4, '0'),
+            manufacturer: getStringDescriptor(device, desc.iManufacturer),
+            serialNumber: getStringDescriptor(device, desc.iSerialNumber),
+            product: getStringDescriptor(device, desc.iProduct)
+        };
+    });
+}
+
+// Helper function to get string descriptors
+function getStringDescriptor(device, index) {
+    try {
+        device.open();
+        const descriptor = device.getStringDescriptor(index);
+        device.close();
+        return descriptor;
+    } catch (error) {
+        return '';
+    }
+}
+
+// Update the device monitoring logic
+let deviceWatcher = null;
+
+function startMonitoring(callback) {
+    if (deviceWatcher) return;
+
+    // Initial device list
+    callback(findDevices());
+
+    // Monitor for device changes
+    usb.on('attach', () => {
+        callback(findDevices());
+    });
+
+    usb.on('detach', () => {
+        callback(findDevices());
+    });
+
+    deviceWatcher = true;
+}
+
+function stopMonitoring() {
+    if (!deviceWatcher) return;
+    
+    usb.removeAllListeners('attach');
+    usb.removeAllListeners('detach');
+    deviceWatcher = null;
+}
+
 module.exports = {
   getPorts,
   connect,
   disconnect,
-  reboot
+  reboot,
+  findDevices,
+  startMonitoring,
+  stopMonitoring
 }

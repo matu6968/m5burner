@@ -7,6 +7,7 @@ const ipc = require('./packages/ipc')
 const { TMP_DIR, FIRMWARE_DIR, DATA_DIR, SHARE_DIR, VIEW_DIR, VIEW_HTML, IMAGE_DIR } = require('./packages/common/filepath')
 const { ensureDir } = require('./packages/fileHelper')
 const { checkUpdate, update } = require('./packages/update')
+const serial = require('./packages/serialport/serial')
 
 app.commandLine.appendSwitch('--disable-http-cache')
 

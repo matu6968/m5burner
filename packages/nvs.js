@@ -1,4 +1,5 @@
-const { SerialPort } = require('usb-native')
+const { SerialPort } = require('serialport')
+const serial = require('./serialport/serial')
 const os = require('os')
 const childProcess = require('child_process')
 const { ipcMain } = require('electron')

@@ -1,7 +1,8 @@
 const { ipcMain } = require('electron')
-const { getPorts, connect, reboot, disconnect} = require('./serial')
+const { getPorts, connect, reboot, disconnect } = require('./serial')
 const { burn, erase, kill, readFirmware, burnIdentify } = require('./tool')
 const IPC_EVENT = require('../ipcEvent')
+const serial = require('./serial')
 
 function bindSerialEvents() {
   ipcMain.on(IPC_EVENT.IPC_START_GET_SERIAL_PORTS_TIMER, async (event, args) => {
@@ -58,6 +59,27 @@ function bindSerialEvents() {
     reboot()
   })
 }
+
+// Update any USB device detection event handlers
+ipcMain.handle('serial:list-devices', async () => {
+  return serial.findDevices()
+})
+
+ipcMain.on('serial:start-monitoring', (event) => {
+  serial.startMonitoring((devices) => {
+    // Send updated device list to renderer
+    event.sender.send('serial:devices-updated', devices)
+  })
+})
+
+ipcMain.on('serial:stop-monitoring', () => {
+  serial.stopMonitoring()
+})
+
+// Keep existing serial port related events
+ipcMain.handle('serial:list', async () => {
+  return await serial.getPorts()
+})
 
 module.exports = {
   bindSerialEvents
