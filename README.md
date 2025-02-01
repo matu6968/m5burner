@@ -3,8 +3,9 @@
 A utility used to flash [M5 Stack devices](https://m5stack.com/) with M5Stack's own firmware (some require an account to download them) or community firmware made by others.
 
 Changes in this version:
-- Newer Electron build (31.0.1 (?) -> 31.7.6)
+- Newer Electron build (16.0.7 -> 34.0.2)
 - Newer version of [esptool.py](https://github.com/espressif/esptool) (4.7-dev -> 4.8.2)
+- Migrate to newer [node-usb](https://github.com/node-usb/node-usb) library from the legacy (node-usb-detection)[https://github.com/MadLittleMods/node-usb-detection] and (node-usb-native)[https://github.com/VSChina/serialport.node] libraries
 
 ## Compile instructions:
 
@@ -23,42 +24,19 @@ yarn postpackage
 ```bash
 electron app.js # for that to work you need to globally add the package via yarn or npm
 ```
-If you are getting an error saying 
-```bash
-A JavaScript error occurred in the main process
-Uncaught Exception:
-Error: This module <usb-detection-module-location> was compiled against a different Node.js version using
-NODE_MODULE_VERSION 127. This version of Node.js requires
-NODE_MODULE_VERSION 125. Please try re-compiling or re-installing
-the module (for instance, using `npm rebuild` or `npm install`).
 ```
-then recompile the dependencies again using electron-rebuild, or if you are getting a weirder error of:
-```bash
-A JavaScript error occurred in the main process
-Uncaught Exception:
-Error: This module <usb-detection-module-location> was compiled against a different Node.js version using
-NODE_MODULE_VERSION 127. This version of Node.js requires
-NODE_MODULE_VERSION 130. Please try re-compiling or re-installing
-the module (for instance, using `npm rebuild` or `npm install`).
-```
-then first downgrade electron to the oldest version, run the app to see if it works and then upgrade it to the latest version:
-```bash
-yarn global add electron@31.0.1
-electron app.js
-yarn global add electron@31.7.6
-electron app.js # this should now launch the app
-```
-4. Compile the additional dependencies and package the app
+4. Compile the additional dependencies and package the app (untested on Mac OS platforms, so make an issue if there is a problem)
 ```bash
 yarn package
 ```
 ## License
-Everything but package.js and other files (see LICENSE) belong to M5Stack due to it being decompiled from the official [M5Burner Linux x64 app](https://docs.m5stack.com/en/download), while package.js is MIT licensed.
-If M5Stack dosen't mind about decompilation of their app then it will be licensed under MIT too. 
+Due to the client having independent changes from the official version, it is under the MIT license.
+(This does not cover images and icons used within this repository which are still M5Stack property.)
+For 3rd party libraries: see LICENSE-3rd-party
 
 ## USB Device Access Setup
 
-Due to the migration of the client to use the node-usb library, several system changes are required to use the new client depending on your system:
+Due to the migration of the client to use the node-usb library, several system changes may be required to use the new client depending on your system:
 
 ### Linux
 Add the following udev rules to `/etc/udev/rules.d/99-usb-serial.rules`:
@@ -78,9 +56,13 @@ sudo udevadm trigger
 
 ### Windows
 No additional setup required, but users need to have the appropriate USB-Serial drivers installed for the specific serial chipset on the device:
+
 CH340, CH341 drivers: https://www.wch-ic.com/downloads/CH341SER_EXE.html (most common on ESP based devices)
+
 CP2102 drivers: https://www.silabs.com/developers/usb-to-uart-bridge-vcp-drivers
+
 CH342, CH343, CH9102 drivers: https://www.wch.cn/downloads/CH343SER_ZIP.html
+
 FTDI drivers: https://ftdichip.com/drivers/vcp-drivers/
 
 ### macOS

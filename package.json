@@ -1,24 +1,25 @@
 {
   "name": "m5burner",
-  "version": "3.0.1",
+  "version": "3.1.0",
   "homepage": "https://docs.m5stack.com/en/download",
   "description": "M5Stack Flash Tool",
   "main": "app.js",
   "author": "M5Stack",
   "dependencies": {
     "@electron/rebuild": "^3.7.1",
-    "@electron/remote": "^2.0.8",
+    "@electron/remote": "^2.1.2",
     "@serialport/bindings-cpp": "^13.0.1",
-    "axios": "^0.26.0",
+    "axios": "^1.7.9",
     "glob": "^11.0.1",
     "lzma-native": "^8.0.6",
-    "serialport": "^12.0.0",
-    "unzipper": "^0.10.11",
-    "usb": "^2.11.0"
+    "serialport": "^13.0.0",
+    "unzipper": "^0.12.3",
+    "usb": "^2.14.0"
   },
   "devDependencies": {
-    "electron": "^34.0.0",
-    "electron-builder": "^24.3.0"
+    "electron": "^34.0.2",
+    "electron-builder": "^25.1.8",
+    "create-dmg": "^7.0.0"
   },
   "scripts": {
     "postpackage": "electron-rebuild",
@@ -39,6 +40,7 @@
       "packages/**/*",
       "package.json",
       "mac-error-win.html",
+      "deps/**/*",
       "assets/m5.ico",
       "assets/m5.png",
       "assets/m5_64.ico",
@@ -57,11 +59,14 @@
       "category": "Utility"
     },
     "mac": {
-      "target": [
-        "zip"
-      ],
+      "target": ["dmg"],
       "icon": "assets/m5.icns",
-      "category": "public.app-category.utilities"
+      "category": "public.app-category.utilities",
+      "darkModeSupport": true,
+      "hardenedRuntime": true,
+      "gatekeeperAssess": false,
+      "entitlements": "build/entitlements.mac.plist",
+      "entitlementsInherit": "build/entitlements.mac.plist"
     }
   }
 }

@@ -3,30 +3,56 @@ const path = require('path');
 const { execSync } = require('child_process');
 
 // Define paths and constants
-let ARCH = process.arch; // Get architecture (e.g., arm64, x64)
-if (ARCH === 'arm') ARCH = 'armv7l'; // Adjust for Electron Builder's naming convention for 32-bit ARM
+let ARCH = process.arch;
+if (ARCH === 'arm') ARCH = 'armv7l';
 
-// Update the electron output path logic to handle x64 differently
-const getElectronOutput = () => {
-    // For x64 architecture, electron-builder uses just 'linux-unpacked'
-    if (ARCH === 'x64') {
-        return 'dist/linux-unpacked';
+// Get platform-specific output paths and settings
+const getPlatformConfig = () => {
+    const platform = process.platform;
+    
+    if (platform === 'darwin') {
+        return {
+            electronOutput: 'dist/mac/M5Burner.app/Contents/Resources/app',
+            outputDir: `m5stack-${ARCH}.app`,
+            electronBuildCmd: 'electron-builder --mac dmg',
+            needsResourcesCopy: true
+        };
+    } else if (platform === 'win32') {
+        return {
+            electronOutput: `dist/win-${ARCH}-unpacked`,
+            outputDir: `m5stack-${ARCH}`,
+            electronBuildCmd: 'electron-builder --win',
+            needsResourcesCopy: false
+        };
+    } else {
+        // Linux
+        return {
+            electronOutput: ARCH === 'x64' ? 'dist/linux-unpacked' : `dist/linux-${ARCH}-unpacked`,
+            outputDir: `m5stack-${ARCH}`,
+            electronBuildCmd: 'electron-builder --linux',
+            needsResourcesCopy: false
+        };
     }
-    // For other architectures, it includes the arch in the path
-    return `dist/linux-${ARCH}-unpacked`;
 };
 
-const BASE_FOLDER = `m5stack-${ARCH}`;
-const ELECTRON_BUILD_CMD = 'electron-builder';
+const platformConfig = getPlatformConfig();
+const BASE_FOLDER = platformConfig.outputDir;
+const ELECTRON_BUILD_CMD = platformConfig.electronBuildCmd;
 const PYINSTALLER_CMD = 'pyinstaller --onefile esp-idf-nvs-partition-gen/esp_idf_nvs_partition_gen/nvs_partition_gen.py --distpath esp-idf-nvs-partition-gen/esp_idf_nvs_partition_gen/dist';
-const ELECTRON_OUTPUT = getElectronOutput();
-const BUILD_DIR = path.resolve('deps_package');
+const ELECTRON_OUTPUT = platformConfig.electronOutput;
+const BUILD_DIR = path.resolve('deps');
 const OUTPUT_DIR = path.resolve(BASE_FOLDER);
 const BIN_DIR = path.join(OUTPUT_DIR, 'bin');
 const PACKAGES_DIR = path.join(OUTPUT_DIR, 'packages');
 const TOOL_DIR = path.join(PACKAGES_DIR, 'tool');
 const PYINSTALLER_BINARY = path.resolve('esp-idf-nvs-partition-gen/esp_idf_nvs_partition_gen/dist/nvs_partition_gen');
 const FILE_TO_COPY = path.resolve(BUILD_DIR, '../assets/M5Burner');
+
+// macOS specific paths
+const MACOS_CONTENTS_DIR = path.join(OUTPUT_DIR, 'Contents');
+const MACOS_RESOURCES_DIR = path.join(MACOS_CONTENTS_DIR, 'Resources');
+const MACOS_FRAMEWORKS_DIR = path.join(MACOS_CONTENTS_DIR, 'Frameworks');
+const MACOS_MACOS_DIR = path.join(MACOS_CONTENTS_DIR, 'MacOS');
 
 // Helper function to run shell commands
 function runCommand(command) {
@@ -55,6 +81,31 @@ function createFolder(folder) {
     }
 }
 
+// New function to handle macOS specific setup
+function setupMacOSStructure() {
+    if (process.platform !== 'darwin') return;
+
+    console.log('Setting up macOS application structure...');
+    
+    // Create the standard macOS app bundle structure
+    createFolder(MACOS_CONTENTS_DIR);
+    createFolder(MACOS_RESOURCES_DIR);
+    createFolder(MACOS_FRAMEWORKS_DIR);
+    createFolder(MACOS_MACOS_DIR);
+
+    // Copy Info.plist if it exists
+    const infoPlistSource = path.resolve('build', 'Info.plist');
+    if (fs.existsSync(infoPlistSource)) {
+        fs.copyFileSync(infoPlistSource, path.join(MACOS_CONTENTS_DIR, 'Info.plist'));
+    }
+
+    // Copy icon file
+    const iconSource = path.resolve('assets', 'm5.icns');
+    if (fs.existsSync(iconSource)) {
+        fs.copyFileSync(iconSource, path.join(MACOS_RESOURCES_DIR, 'm5.icns'));
+    }
+}
+
 // Main script
 (function main() {
     console.log('Starting the build and packaging process...');
@@ -71,53 +122,48 @@ function createFolder(folder) {
     cleanUp(OUTPUT_DIR);
 
     // Step 4: Create required folder structure
-    createFolder(OUTPUT_DIR);
-    createFolder(BIN_DIR);
-    createFolder(PACKAGES_DIR);
-    createFolder(TOOL_DIR);
+    if (process.platform === 'darwin') {
+        setupMacOSStructure();
+    } else {
+        createFolder(OUTPUT_DIR);
+        createFolder(BIN_DIR);
+        createFolder(PACKAGES_DIR);
+        createFolder(TOOL_DIR);
+    }
 
-    // Step 5: Copy Electron Builder output to bin folder
-    console.log(`Copying Electron Builder output from ${ELECTRON_OUTPUT} to ${BIN_DIR}...`);
+    // Step 5: Copy Electron Builder output
+    console.log(`Copying Electron Builder output from ${ELECTRON_OUTPUT}...`);
     if (!fs.existsSync(ELECTRON_OUTPUT)) {
         console.error(`Electron output folder not found: ${ELECTRON_OUTPUT}`);
         process.exit(1);
     }
-    fs.cpSync(ELECTRON_OUTPUT, BIN_DIR, { recursive: true });
 
-    // Step 6: Copy dependency directory files to packages folder
-    console.log(`Copying dependencies (esptool.py) from build directory (${BUILD_DIR}) to ${PACKAGES_DIR}...`);
+    const targetDir = process.platform === 'darwin' ? MACOS_RESOURCES_DIR : BIN_DIR;
+    fs.cpSync(ELECTRON_OUTPUT, targetDir, { recursive: true });
+
+    // Step 6: Copy dependency directory files
+    const depsTargetDir = process.platform === 'darwin' ? 
+        path.join(MACOS_RESOURCES_DIR, 'packages') : PACKAGES_DIR;
+    
+    console.log(`Copying dependencies from ${BUILD_DIR} to ${depsTargetDir}...`);
     if (fs.existsSync(BUILD_DIR)) {
-        fs.cpSync(BUILD_DIR, PACKAGES_DIR, { recursive: true });
-    } else {
-        console.warn(`Build directory not found: ${BUILD_DIR}`);
+        fs.cpSync(BUILD_DIR, depsTargetDir, { recursive: true });
     }
 
-    // Step 7: Copy arm64 compiled NVS Partition Generator Utility to tool folder inside packages
-    console.log(`Copying ESP NVS tool binary to ${TOOL_DIR}...`);
+    // Step 7: Copy NVS tool
+    const toolTargetDir = process.platform === 'darwin' ? 
+        path.join(MACOS_RESOURCES_DIR, 'packages', 'tool') : TOOL_DIR;
+
+    console.log(`Copying ESP NVS tool binary to ${toolTargetDir}...`);
     if (fs.existsSync(PYINSTALLER_BINARY)) {
-        const renamedBinaryPath = path.join(TOOL_DIR, 'nvs');
+        const renamedBinaryPath = path.join(toolTargetDir, 'nvs');
         fs.copyFileSync(PYINSTALLER_BINARY, renamedBinaryPath);
-        console.log(`Renamed and copied binary to: ${renamedBinaryPath}`);
-    } else {
-        console.error(`ESP NVS tool binary not found: ${PYINSTALLER_BINARY}`);
-        process.exit(1);
     }
 
-    // Step 8: Copy the M5Burner startup script from the build directory to the root of the architecture folder
-    console.log(`Copying M5Burner startup script from build directory to root of ${OUTPUT_DIR}...`);
-    if (fs.existsSync(FILE_TO_COPY)) {
-        const destinationPath = path.join(OUTPUT_DIR, path.basename(FILE_TO_COPY));
-        fs.copyFileSync(FILE_TO_COPY, destinationPath);
-        console.log(`Copied file to: ${destinationPath}`);
-    } else {
-        console.warn(`File to copy not found: ${FILE_TO_COPY}`);
-    }
-
-    // Step 9: Clean up PyInstaller output folder
-    const pyinstallerOutputFolder = path.dirname(PYINSTALLER_BINARY);
-    if (fs.existsSync(pyinstallerOutputFolder)) {
-        console.log(`Cleaning up PyInstaller output folder: ${pyinstallerOutputFolder}`);
-        cleanUp(pyinstallerOutputFolder);
+    // Step 8: For macOS, create DMG
+    if (process.platform === 'darwin') {
+        console.log('Creating DMG file...');
+        runCommand('create-dmg "m5stack-${ARCH}.app" dist/ || true');  // || true because create-dmg returns non-zero on warnings
     }
 
     console.log('Build and packaging process completed successfully.');

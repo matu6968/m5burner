@@ -1,0 +1,7 @@
+Several other tools that are being used in M5Burner are 3rd party, it's license details are below:
+
+esptool.py and esptool (in deps_package/tool): GPL-2.0 (license: https://github.com/espressif/esptool/blob/master/LICENSE)
+nvs_partition_gen: Apache-2.0 (license: https://github.com/espressif/esp-idf-nvs-partition-gen/blob/main/LICENSE)
+intelhex (in deps_package/tool): BSD-3-Clause (license: https://github.com/python-intelhex/intelhex/blob/master/LICENSE.txt)
+serial: (in deps_package/tool): BSD-3-Clause (license: https://github.com/pyserial/pyserial/blob/master/LICENSE.txt)
+kflash.py (in deps_package/tool): MIT (license: https://github.com/kendryte/kflash.py/blob/master/LICENSE)

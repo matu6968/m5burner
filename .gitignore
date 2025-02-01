@@ -1,0 +1,5 @@
+build/nvs_partition_gen
+dist
+m5stack-*
+node_modules
+yarn.lock
