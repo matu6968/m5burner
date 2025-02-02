@@ -1,4 +1,7 @@
 build/nvs_partition_gen
+build/esptool
+build/kflash
+build/gen_esp32part
 dist
 m5stack-*
 node_modules

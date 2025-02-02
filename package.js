@@ -46,13 +46,34 @@ const BIN_DIR = path.join(OUTPUT_DIR, 'bin');
 const PACKAGES_DIR = path.join(OUTPUT_DIR, 'packages');
 const TOOL_DIR = path.join(PACKAGES_DIR, 'tool');
 const PYINSTALLER_BINARY = path.resolve('esp-idf-nvs-partition-gen/esp_idf_nvs_partition_gen/dist/nvs_partition_gen');
-const FILE_TO_COPY = path.resolve(BUILD_DIR, '../assets/M5Burner');
+const STARTUP_SCRIPT_LINUX = path.resolve(BUILD_DIR, '../assets/M5Burner');
+const STARTUP_BINARY_WINDOWS = path.resolve(BUILD_DIR, '../assets/win32-launcher/precompiled/M5Burner.exe');
 
 // macOS specific paths
 const MACOS_CONTENTS_DIR = path.join(OUTPUT_DIR, 'Contents');
 const MACOS_RESOURCES_DIR = path.join(MACOS_CONTENTS_DIR, 'Resources');
 const MACOS_FRAMEWORKS_DIR = path.join(MACOS_CONTENTS_DIR, 'Frameworks');
 const MACOS_MACOS_DIR = path.join(MACOS_CONTENTS_DIR, 'MacOS');
+
+// Define Python utilities to compile
+const PYTHON_UTILITIES = [
+    {
+        script: 'esp-idf-nvs-partition-gen/esp_idf_nvs_partition_gen/nvs_partition_gen.py',
+        output: 'nvs'
+    },
+    {
+        script: 'packages/tool/esptool.py',
+        output: 'esptool'
+    },
+    {
+        script: 'packages/tool/kflash.py',
+        output: 'kflash'
+    },
+    {
+        script: 'packages/tool/gen_esp32part.py',
+        output: 'gen_esp32part'
+    }
+];
 
 // Helper function to run shell commands
 function runCommand(command) {
@@ -106,6 +127,68 @@ function setupMacOSStructure() {
     }
 }
 
+// Helper function to compile Python utilities with PyInstaller
+function compilePythonUtilities() {
+    if (process.platform !== 'win32') return;
+
+    console.log('Compiling Python utilities with PyInstaller...');
+    
+    PYTHON_UTILITIES.forEach(util => {
+        const pyinstallerCmd = `pyinstaller --onefile "${util.script}" --distpath "${path.join('packages', 'tool', 'dist')}" --name "${util.output}"`;
+        console.log(`Compiling ${util.script}...`);
+        try {
+            execSync(pyinstallerCmd, { stdio: 'inherit' });
+        } catch (err) {
+            console.error(`Failed to compile ${util.script}:`, err);
+            process.exit(1);
+        }
+    });
+}
+
+// Helper function to copy compiled utilities
+function copyCompiledUtilities(targetDir) {
+    if (process.platform !== 'win32') return;
+
+    console.log('Copying compiled Python utilities...');
+    const distDir = path.join('packages', 'tool', 'dist');
+    
+    PYTHON_UTILITIES.forEach(util => {
+        const exeName = `${util.output}.exe`;
+        const sourcePath = path.join(distDir, exeName);
+        const targetPath = path.join(targetDir, exeName);
+        
+        if (fs.existsSync(sourcePath)) {
+            fs.copyFileSync(sourcePath, targetPath);
+            console.log(`Copied ${exeName} to ${targetDir}`);
+        } else {
+            console.warn(`Compiled utility not found: ${sourcePath}`);
+        }
+    });
+}
+
+// Helper function to clean up Python build artifacts
+function cleanPythonBuildArtifacts() {
+    if (process.platform !== 'win32') return;
+
+    console.log('Cleaning up Python build artifacts...');
+    const foldersToClean = ['build', 'dist', '__pycache__'];
+    
+    foldersToClean.forEach(folder => {
+        const folderPath = path.join('packages', 'tool', folder);
+        if (fs.existsSync(folderPath)) {
+            fs.rmSync(folderPath, { recursive: true, force: true });
+        }
+    });
+
+    // Clean up .spec files
+    PYTHON_UTILITIES.forEach(util => {
+        const specFile = path.join('packages', 'tool', `${util.output}.spec`);
+        if (fs.existsSync(specFile)) {
+            fs.unlinkSync(specFile);
+        }
+    });
+}
+
 // Main script
 (function main() {
     console.log('Starting the build and packaging process...');
@@ -114,9 +197,15 @@ function setupMacOSStructure() {
     console.log('Running Electron Builder...');
     runCommand(ELECTRON_BUILD_CMD);
 
-    // Step 2: Compile ESP NVS Partition Generator Utility with PyInstaller
-    console.log('Compiling ESP NVS tool with PyInstaller...');
-    runCommand(PYINSTALLER_CMD);
+    // Step 2: Compile Python utilities on Windows
+    if (process.platform === 'win32') {
+        cleanPythonBuildArtifacts(); // Clean up any previous builds
+        compilePythonUtilities();
+    } else {
+        // Original PyInstaller command for non-Windows platforms
+        console.log('Compiling ESP NVS tool with PyInstaller...');
+        runCommand(PYINSTALLER_CMD);
+    }
 
     // Step 3: Clean up existing architecture folder
     cleanUp(OUTPUT_DIR);
@@ -150,14 +239,22 @@ function setupMacOSStructure() {
         fs.cpSync(BUILD_DIR, depsTargetDir, { recursive: true });
     }
 
-    // Step 7: Copy NVS tool
+    // Step 7: Handle Python utilities
     const toolTargetDir = process.platform === 'darwin' ? 
         path.join(MACOS_RESOURCES_DIR, 'packages', 'tool') : TOOL_DIR;
 
-    console.log(`Copying ESP NVS tool binary to ${toolTargetDir}...`);
-    if (fs.existsSync(PYINSTALLER_BINARY)) {
-        const renamedBinaryPath = path.join(toolTargetDir, 'nvs');
-        fs.copyFileSync(PYINSTALLER_BINARY, renamedBinaryPath);
+    if (process.platform === 'win32') {
+        // Copy compiled Python utilities on Windows
+        copyCompiledUtilities(toolTargetDir);
+        // Clean up build artifacts
+        cleanPythonBuildArtifacts();
+    } else {
+        // Original NVS tool copy for non-Windows platforms
+        console.log(`Copying ESP NVS tool binary to ${toolTargetDir}...`);
+        if (fs.existsSync(PYINSTALLER_BINARY)) {
+            const renamedBinaryPath = path.join(toolTargetDir, 'nvs');
+            fs.copyFileSync(PYINSTALLER_BINARY, renamedBinaryPath);
+        }
     }
 
     // Step 8: For macOS, create DMG
@@ -166,6 +263,29 @@ function setupMacOSStructure() {
         runCommand('create-dmg "m5stack-${ARCH}.app" dist/ || true');  // || true because create-dmg returns non-zero on warnings
     }
 
+    // Step 9: Copy the M5Burner startup script from the build directory to the root of the architecture folder if running on Windows or Linux
+    if (process.platform === 'win32') {
+        console.log(`Copying M5Burner startup binary from build directory to root of ${OUTPUT_DIR}...`);
+        if (fs.existsSync(STARTUP_BINARY_WINDOWS)) {
+            const destinationPath = path.join(OUTPUT_DIR, path.basename(STARTUP_BINARY_WINDOWS));
+            fs.copyFileSync(STARTUP_BINARY_WINDOWS, destinationPath);
+            console.log(`Copied file to: ${destinationPath}`);
+        } else {
+            console.warn(`File to copy not found: ${STARTUP_BINARY_WINDOWS}`);
+        }
+    } else if (process.platform === 'linux') {
+        console.log(`Copying M5Burner startup script from build directory to root of ${OUTPUT_DIR}...`);
+        if (fs.existsSync(STARTUP_SCRIPT_LINUX)) {
+            const destinationPath = path.join(OUTPUT_DIR, path.basename(STARTUP_SCRIPT_LINUX));
+            fs.copyFileSync(STARTUP_SCRIPT_LINUX, destinationPath);
+            console.log(`Copied file to: ${destinationPath}`);
+        } else {
+            console.warn(`File to copy not found: ${STARTUP_SCRIPT_LINUX}`);
+        }
+    } else {
+        console.log('You are not running Linux or Windows, skipping startup script/binary copy');
+    }
+    
     console.log('Build and packaging process completed successfully.');
 })();
 

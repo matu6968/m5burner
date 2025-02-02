@@ -4,7 +4,7 @@ A utility used to flash [M5 Stack devices](https://m5stack.com/) with M5Stack's 
 
 Changes in this version:
 - Newer Electron build (16.0.7 -> 34.0.2)
-- Newer version of [esptool.py](https://github.com/espressif/esptool) (4.7-dev -> 4.8.2)
+- Newer version of [esptool.py](https://github.com/espressif/esptool) (4.7-dev -> 4.8.1)
 - Migrate to newer [node-usb](https://github.com/node-usb/node-usb) library from the legacy [node-usb-detection](https://github.com/MadLittleMods/node-usb-detection) and [node-usb-native](https://github.com/VSChina/serialport.node) libraries
 
 ## Compile instructions:
@@ -14,6 +14,7 @@ Changes in this version:
 git clone --recurse-submodules https://github.com/matu6968/m5burner.git 
 cd m5burner
 yarn install
+yarn install appdmg # only needed for making .dmg files and MacOS compatible only dependency
 pip install pyinstaller
 ```
 2. Recompile native dependencies
@@ -31,7 +32,9 @@ yarn package
 ```
 ## License
 Due to the client having independent changes from the official version, it is under the MIT license.
-(This does not cover images and icons used within this repository which are still M5Stack property.)
+
+### ⚠️ Warning: This does not cover images and icons used within this repository which are still M5Stack property.
+
 For 3rd party libraries: see LICENSE-3rd-party
 
 ## USB Device Access Setup
