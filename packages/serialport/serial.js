@@ -2,7 +2,7 @@ const { platform } = require('os')
 const fs = require('fs')
 const { promisify } = require('util')
 const usb = require('usb')
-const SerialPort = require('serialport')
+const { SerialPort } = require('serialport')
 
 const readDirAsync = promisify(fs.readdir)
 
@@ -11,12 +11,12 @@ let currentSerialPort = null
 async function getPorts() {
   let ports = []
   if(platform() === 'linux' || platform() === 'darwin') {
-    // linux或MacOS下获取串口列表
+    // linux or MacOS port listing
     try {
       ports = await readDirAsync('/dev')
     }
     catch(e) {
-      console.log(e.message)
+      console.log('[ERR] Failed to read /dev:', e.message)
     }
     if(platform() === 'darwin') {
       return ports.filter(p => p.startsWith('tty.'))
@@ -24,97 +24,119 @@ async function getPorts() {
       return ports.filter(p => p.startsWith('ttyUSB') || p.startsWith('ttyACM'))
     }
   } else {
-    // 其他操作系统
-    ports = await SerialPort.list()
-    return ports.map(p => p.path)
+    // Windows and other OS port listing
+    try {
+      ports = await SerialPort.list()
+      return ports.map(p => p.path)
+    } catch(e) {
+      console.log('[ERR] Failed to list serial ports:', e.message)
+      return []
+    }
   }
 }
 
 function connect(com, send) {
   let comName = platform() === 'linux' || platform() === 'darwin' ? '/dev/' + com : com
 
+  // Close existing connection first
   if(currentSerialPort !== null) {
     currentSerialPort.close(e => {
       if(e) {
-        console.log(e.message)
+        console.log('[ERR] Failed to close existing port:', e.message)
       }
-
       currentSerialPort = null
       connect(com, send)
     })
     return
   }
 
+  // Configure port settings
   const basicConf = {
-    baudRate: 115200
+    baudRate: 115200,
+    autoOpen: false  // Don't open immediately to handle errors better
   }
 
-  const winConf = Object.assign({}, {
+  const winConf = {
+    ...basicConf,
     rtscts: true
-  }, basicConf)
+  }
 
-  currentSerialPort = new SerialPort(comName, platform() === 'win32' ? winConf : basicConf)
+  try {
+    // Create new SerialPort instance
+    currentSerialPort = new SerialPort({
+      path: comName,
+      ...platform() === 'win32' ? winConf : basicConf
+    })
 
-  currentSerialPort.on('open', _ => {
-    send(`[FROM M5Burner] ${currentSerialPort.path} opened.\r\n`)
-  })
+    // Handle port opening
+    currentSerialPort.open((err) => {
+      if (err) {
+        send(`[ERR] Failed to open ${comName}: ${err.message}\r\n`)
+        currentSerialPort = null
+        return
+      }
+      send(`[FROM M5Burner] ${comName} opened.\r\n`)
+    })
 
-  currentSerialPort.on('data', chunk => {
-    send(chunk.toString())
-  })
+    // Set up event handlers
+    currentSerialPort.on('data', chunk => {
+      send(chunk.toString())
+    })
 
-  currentSerialPort.on('error', e => {
-    send(e.message + '\r\n')
-  })
+    currentSerialPort.on('error', e => {
+      send(`[ERR] ${e.message}\r\n`)
+    })
 
+    currentSerialPort.on('close', () => {
+      send(`[FROM M5Burner] ${comName} closed.\r\n`)
+      currentSerialPort = null
+    })
+
+  } catch(e) {
+    send(`[ERR] Failed to create SerialPort instance: ${e.message}\r\n`)
+    currentSerialPort = null
+  }
 }
 
 function disconnect() {
-  if(currentSerialPort === null)
-    return
+  if(currentSerialPort === null) return
 
   try {
     currentSerialPort.close(e => {
       if(e) {
-        console.log(e.message + '\r\n')
+        console.log('[ERR] Failed to close port:', e.message)
       }
       currentSerialPort = null
     })
   } catch(e) {
-    console.log(e.message + '\r\n')
+    console.log('[ERR] Error during disconnect:', e.message)
+    currentSerialPort = null
   }
 }
 
 function reboot() {
-  if(currentSerialPort) {
-    const commonConf = {
-      first: {
-        rts: true,
-        dtr: false
-      },
-      second: {
-        rts: false,
-        dtr: false
-      }
-    }
-    const winConf = {
-      first: {
-        rts: true,
-        dtr: false
-      },
-      second: {
-        rts: false,
-        dtr: true
-      }
-    }
+  if(!currentSerialPort) return
 
-    const conf = platform() === 'win32' ? winConf : commonConf
+  const commonConf = {
+    first: { rts: true, dtr: false },
+    second: { rts: false, dtr: false }
+  }
 
-    currentSerialPort.set(conf.first, _ => {
-      currentSerialPort.set(conf.second, _ => {
-        console.log(`[INFO] ${currentSerialPort.path} reboot`)
+  const winConf = {
+    first: { rts: true, dtr: false },
+    second: { rts: false, dtr: true }
+  }
+
+  const conf = platform() === 'win32' ? winConf : commonConf
+
+  try {
+    currentSerialPort.set(conf.first, () => {
+      currentSerialPort.set(conf.second, () => {
+        console.log(`[INFO] ${currentSerialPort.path} rebooted`)
       })
     })
+  } catch(e) {
+    console.log('[ERR] Failed to reboot device:', e.message)
   }
 }
 
