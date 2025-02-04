@@ -17,11 +17,11 @@
     "usb": "^2.14.0"
   },
   "devDependencies": {
-    "electron": "^34.0.2",
+    "electron": "35.0.0-beta.1",
     "electron-builder": "^25.1.8"
   },
   "scripts": {
-    "postpackage": "electron-rebuild",
+    "postpackage": "electron-rebuild clean",
     "nvsbuild": "pyinstaller --onefile esp-idf-nvs-partition-gen/esp_idf_nvs_partition_gen/nvs_partition_gen.py && mv /dist/nvs_partition_gen nvs && cp dist/nvs .",
     "rebuild": "electron-rebuild -f -w usb,serialport,@serialport/bindings-cpp",
     "package": "node package.js",
@@ -59,7 +59,9 @@
       "category": "Utility"
     },
     "mac": {
-      "target": ["dmg"],
+      "target": [
+        "dmg"
+      ],
       "icon": "assets/m5.icns",
       "category": "public.app-category.utilities",
       "darkModeSupport": true,

@@ -1,6 +1,6 @@
 const fs = require('fs');
 const path = require('path');
-const { execSync } = require('child_process');
+const { execSync, spawnSync } = require('child_process');
 
 // Define paths and constants
 let ARCH = process.arch;
@@ -12,14 +12,14 @@ const getPlatformConfig = () => {
     
     if (platform === 'darwin') {
         return {
-            electronOutput: 'dist/mac/M5Burner.app/Contents/Resources/app',
+            electronOutput: ARCH === 'x64' ? 'dist/mac/M5Burner.app/Contents/Resources/app' : `dist/mac-${ARCH}/M5Burner.app/Contents/Resources/app`,
             outputDir: `m5stack-${ARCH}.app`,
             electronBuildCmd: 'electron-builder --mac dmg',
             needsResourcesCopy: true
         };
     } else if (platform === 'win32') {
         return {
-            electronOutput: `dist/win-${ARCH}-unpacked`,
+            electronOutput: ARCH === 'x64' ? 'dist/win-unpacked' : `dist/win-${ARCH}-unpacked`,
             outputDir: `m5stack-${ARCH}`,
             electronBuildCmd: 'electron-builder --win',
             needsResourcesCopy: false
@@ -62,15 +62,15 @@ const PYTHON_UTILITIES = [
         output: 'nvs'
     },
     {
-        script: 'packages/tool/esptool.py',
+        script: 'deps/tool/esptool.py',
         output: 'esptool'
     },
     {
-        script: 'packages/tool/kflash.py',
+        script: 'deps/tool/kflash.py',
         output: 'kflash'
     },
     {
-        script: 'packages/tool/gen_esp32part.py',
+        script: 'deps/tool/gen_esp32part.py',
         output: 'gen_esp32part'
     }
 ];
@@ -133,8 +133,28 @@ function compilePythonUtilities() {
 
     console.log('Compiling Python utilities with PyInstaller...');
     
+    // Install required dependencies first
+    console.log('Installing required Python dependencies...');
+    try {
+        execSync('pip install cryptography', { stdio: 'inherit' });
+    } catch (err) {
+        console.error('Failed to install cryptography dependency:', err);
+        process.exit(1);
+    }
+    
     PYTHON_UTILITIES.forEach(util => {
-        const pyinstallerCmd = `pyinstaller --onefile "${util.script}" --distpath "${path.join('packages', 'tool', 'dist')}" --name "${util.output}"`;
+        let pyinstallerCmd = `pyinstaller --onefile "${util.script}" --distpath "${path.join('packages', 'tool', 'dist')}" --name "${util.output}" --hidden-import cryptography`;
+        
+        // Add icon for esptool
+        if (util.output === 'esptool') {
+            const iconPath = path.resolve('assets', 'esptool.ico');
+            if (fs.existsSync(iconPath)) {
+                pyinstallerCmd += ` --icon "${iconPath}"`;
+            } else {
+                console.warn('esptool icon not found at:', iconPath);
+            }
+        }
+        
         console.log(`Compiling ${util.script}...`);
         try {
             execSync(pyinstallerCmd, { stdio: 'inherit' });
@@ -152,6 +172,7 @@ function copyCompiledUtilities(targetDir) {
     console.log('Copying compiled Python utilities...');
     const distDir = path.join('packages', 'tool', 'dist');
     
+    // Copy compiled Python executables
     PYTHON_UTILITIES.forEach(util => {
         const exeName = `${util.output}.exe`;
         const sourcePath = path.join(distDir, exeName);
@@ -162,6 +183,24 @@ function copyCompiledUtilities(targetDir) {
             console.log(`Copied ${exeName} to ${targetDir}`);
         } else {
             console.warn(`Compiled utility not found: ${sourcePath}`);
+        }
+    });
+
+    // Copy additional required binary files
+    const additionalBinaries = [
+        'burner_nvs.bin',
+        'esp32_board_identify.bin'
+    ];
+
+    additionalBinaries.forEach(binFile => {
+        const sourcePath = path.join(BUILD_DIR, 'tool', binFile);
+        const targetPath = path.join(targetDir, binFile);
+        
+        if (fs.existsSync(sourcePath)) {
+            fs.copyFileSync(sourcePath, targetPath);
+            console.log(`Copied ${binFile} to ${targetDir}`);
+        } else {
+            console.warn(`Binary file not found: ${sourcePath}`);
         }
     });
 }
@@ -187,6 +226,57 @@ function cleanPythonBuildArtifacts() {
             fs.unlinkSync(specFile);
         }
     });
+}
+
+// Get the short git commit hash if available
+function getGitCommitHash() {
+    try {
+        const result = spawnSync('git', ['rev-parse', '--short', 'HEAD']);
+        if (result.status === 0) {
+            return result.stdout.toString().trim();
+        }
+    } catch (error) {
+        console.warn('Git command failed, skipping commit hash');
+    }
+    return '';
+}
+
+// Generate timestamp-based version
+function generateTimestampVersion() {
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const day = String(now.getDate()).padStart(2, '0');
+    const hour = String(now.getHours()).padStart(2, '0');
+    const minute = String(now.getMinutes()).padStart(2, '0');
+    return `${year}${month}${day}${hour}${minute}`;
+}
+
+// Create zip archive
+function createZipArchive(sourceDir, version, gitHash) {
+    const platform = process.platform === 'win32' ? 'win' : 
+                    process.platform === 'darwin' ? 'mac' : `linux-${ARCH}`;
+    
+    // Construct zip filename
+    let zipName = `M5Burner-${version}-${platform}`;
+    if (gitHash) {
+        zipName += `-${gitHash}`;
+    }
+    zipName += '.zip';
+
+    console.log(`Creating zip archive: ${zipName}`);
+    
+    // Use system zip command
+    const zipCommand = process.platform === 'win32' ?
+        `powershell Compress-Archive -Path "${sourceDir}/*" -DestinationPath "${zipName}" -Force` :
+        `zip -r "${zipName}" "${sourceDir}"/*`;
+    
+    try {
+        execSync(zipCommand);
+        console.log(`Successfully created ${zipName}`);
+    } catch (error) {
+        console.error('Failed to create zip archive:', error);
+    }
 }
 
 // Main script
@@ -236,7 +326,27 @@ function cleanPythonBuildArtifacts() {
     
     console.log(`Copying dependencies from ${BUILD_DIR} to ${depsTargetDir}...`);
     if (fs.existsSync(BUILD_DIR)) {
-        fs.cpSync(BUILD_DIR, depsTargetDir, { recursive: true });
+        if (process.platform === 'win32') {
+            // On Windows, only copy directories that aren't Python-related
+            const dirsToExclude = ['esptool', 'intelhex', 'serial', '__pycache__', 'tool'];
+            
+            // Create the target directory
+            createFolder(depsTargetDir);
+            
+            // Copy only non-excluded directories
+            fs.readdirSync(BUILD_DIR).forEach(item => {
+                const sourcePath = path.join(BUILD_DIR, item);
+                const targetPath = path.join(depsTargetDir, item);
+                
+                if (fs.statSync(sourcePath).isDirectory() && !dirsToExclude.includes(item)) {
+                    // Copy directories that are not in the exclude list
+                    fs.cpSync(sourcePath, targetPath, { recursive: true });
+                }
+            });
+        } else {
+            // For non-Windows platforms, copy everything as before
+            fs.cpSync(BUILD_DIR, depsTargetDir, { recursive: true });
+        }
     }
 
     // Step 7: Handle Python utilities
@@ -284,6 +394,35 @@ function cleanPythonBuildArtifacts() {
         }
     } else {
         console.log('You are not running Linux or Windows, skipping startup script/binary copy');
+    }
+    
+    // Generate and write appVersion.info
+    const timestampVersion = generateTimestampVersion();
+    const appVersionPath = path.join(PACKAGES_DIR, 'appVersion.info');
+    
+    console.log('Creating appVersion.info...');
+    fs.writeFileSync(appVersionPath, timestampVersion);
+    
+    // Check if --new-release flag is present
+    if (process.argv.includes('--new-release')) {
+        console.log('Creating release archive...');
+        
+        // Read version from package.json
+        const packageJsonPath = path.resolve('package.json');
+        let version;
+        try {
+            const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, 'utf8'));
+            version = packageJson.version;
+        } catch (error) {
+            console.error('Failed to read package.json:', error);
+            process.exit(1);
+        }
+        
+        // Get git commit hash
+        const gitHash = getGitCommitHash();
+        
+        // Create zip archive
+        createZipArchive(OUTPUT_DIR, version, gitHash);
     }
     
     console.log('Build and packaging process completed successfully.');

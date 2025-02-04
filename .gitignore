@@ -6,3 +6,8 @@ dist
 m5stack-*
 node_modules
 yarn.lock
+deps/tool/serial/tools/__pycache__/
+deps/tool/esptool/__pycache__/
+deps/tool/esptool/targets/__pycache__/
+deps/tool/intelhex/__pycache__/
+deps/tool/serial/__pycache__/
