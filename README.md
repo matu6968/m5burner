@@ -3,7 +3,7 @@
 A utility used to flash [M5 Stack devices](https://m5stack.com/) with M5Stack's own firmware (some require an account to download them) or community firmware made by others.
 
 Changes in this version:
-- Newer Electron build (16.0.7 -> 34.0.2)
+- Newer Electron build (16.0.7 -> 35.0.0-beta.2)
 - Newer version of [esptool.py](https://github.com/espressif/esptool) (4.7-dev -> 4.8.1)
 - Migrate to newer [node-usb](https://github.com/node-usb/node-usb) library from the legacy [node-usb-detection](https://github.com/MadLittleMods/node-usb-detection) and [node-usb-native](https://github.com/VSChina/serialport.node) libraries
 
@@ -21,10 +21,9 @@ pip install pyinstaller
 ```bash
 yarn postpackage
 ```
-3. Test the app if it works
+3. Test the app if it works (this checks if node modules are properly compiled)
 ```bash
-electron app.js # for that to work you need to globally add the package via yarn or npm
-```
+yarn test
 ```
 4. Compile the additional dependencies and package the app (untested on Mac OS platforms, so make an issue if there is a problem)
 ```bash
@@ -46,10 +45,18 @@ Add the following udev rules to `/etc/udev/rules.d/99-usb-serial.rules`:
 
 # CP210x devices
 SUBSYSTEM=="usb", ATTRS{idVendor}=="10c4", ATTRS{idProduct}=="ea60", MODE="0666"
-# CH34x devices
+# CH340/CH341 devices
 SUBSYSTEM=="usb", ATTRS{idVendor}=="1a86", ATTRS{idProduct}=="7523", MODE="0666"
+# CH342 devices
+SUBSYSTEM=="usb", ATTRS{idVendor}=="1a86", ATTRS{idProduct}=="55D2", MODE="0666"
+# CH343 devices
+SUBSYSTEM=="usb", ATTRS{idVendor}=="1a86", ATTRS{idProduct}=="55D3", MODE="0666"
+# CH9102 devices
+SUBSYSTEM=="usb", ATTRS{idVendor}=="1a86", ATTRS{idProduct}=="55D4", MODE="0666"
 # FTDI devices
 SUBSYSTEM=="usb", ATTRS{idVendor}=="0403", MODE="0666"
+# ESP32-S3/-C6 devices with internal USB-CDC adapters
+SUBSYSTEM=="usb", ATTRS{idVendor}=="303a", MODE="0666"
 
 Then reload the rules:
 ```bash
@@ -67,6 +74,8 @@ CP2102 drivers: https://www.silabs.com/developers/usb-to-uart-bridge-vcp-drivers
 CH342, CH343, CH9102 drivers: https://www.wch.cn/downloads/CH343SER_ZIP.html
 
 FTDI drivers: https://ftdichip.com/drivers/vcp-drivers/
+
+ESP32-S3/-C6 USB-CDC driver setup (guide to use with libusb): https://docs.espressif.com/projects/esp-idf/en/v5.4/esp32s3/api-guides/dfu.html?#api-guide-dfu-flash-win
 
 ### macOS
 No additional setup required.

@@ -151,10 +151,17 @@ function findDevices() {
         // CP210x: VID=0x10C4, PID=0xEA60
         // CH34x:  VID=0x1A86, PID=0x7523
         // FTDI:   VID=0x0403, various PIDs
+        // ESP32-S3/-C6: VID=0x303A, various PIDs
+        // CH342:   VID=0x1A86, PID=0x55D2
+        // CH343:   VID=0x1A86, PID=0x55D3
+        // CH9102: VID=0x1A86, PID=0x55D4
+
         return (
             (desc.idVendor === 0x10C4 && desc.idProduct === 0xEA60) || // CP210x
-            (desc.idVendor === 0x1A86 && desc.idProduct === 0x7523) || // CH34x
-            (desc.idVendor === 0x0403) // FTDI devices
+            (desc.idVendor === 0x1A86 && desc.idProduct === 0x7523) || // CH340/CH341
+            (desc.idVendor === 0x303A) || // ESP32-S3/-C6 devices with internal USB-CDC adapters
+            (desc.idVendor === 0x0403) || // FTDI devices
+            (desc.idVendor === 0x1A86 && (desc.idProduct === 0x55D2 || desc.idProduct === 0x55D3 || desc.idProduct === 0x55D4)) // CH342/CH343/CH9102
         );
     }).map(device => {
         const desc = device.deviceDescriptor;

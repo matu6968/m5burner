@@ -17,7 +17,7 @@
     "usb": "^2.14.0"
   },
   "devDependencies": {
-    "electron": "35.0.0-beta.1",
+    "electron": "35.0.0-beta.2",
     "electron-builder": "^25.1.8"
   },
   "scripts": {
@@ -25,7 +25,7 @@
     "nvsbuild": "pyinstaller --onefile esp-idf-nvs-partition-gen/esp_idf_nvs_partition_gen/nvs_partition_gen.py && mv /dist/nvs_partition_gen nvs && cp dist/nvs .",
     "rebuild": "electron-rebuild -f -w usb,serialport,@serialport/bindings-cpp",
     "package": "node package.js",
-    "run": "electron app.js",
+    "test": "electron app.js",
     "create-update": "node scripts/create-update-package.js"
   },
   "build": {
