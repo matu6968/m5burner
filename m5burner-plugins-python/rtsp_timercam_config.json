@@ -1,0 +1,5 @@
+{
+    "mode": "rtsp",
+    "wifi_ssid": "MyNetwork",
+    "wifi_pwd": "MyPassword"
+}

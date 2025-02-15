@@ -1,0 +1,12 @@
+{
+    "mode": "s3",
+    "wifi_ssid": "MyNetwork",
+    "wifi_pwd": "MyPassword",
+    "amazon_s3_host": "s3.amazonaws.com",
+    "access_key": "aceess-key",
+    "secret_access_key": "secret-key",
+    "pic_path": "pictures/timercam",
+    "pic_name": "img",
+    "size": 14,
+    "interval": 30
+}

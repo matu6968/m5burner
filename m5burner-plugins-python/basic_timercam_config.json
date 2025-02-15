@@ -1,0 +1,7 @@
+{
+    "mode": "basic",
+    "ssid": "MyNetwork",
+    "pwd": "MyPassword",
+    "wake_time": 30,
+    "image_size": 5
+}

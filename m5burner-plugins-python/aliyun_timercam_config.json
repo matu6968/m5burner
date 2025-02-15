@@ -1,0 +1,11 @@
+{
+    "mode": "aliyun",
+    "ssid": "MyNetwork",
+    "pwd": "MyPassword",
+    "wake_time": 30,
+    "image_size": 13,
+    "access_key": "access-key",
+    "access_key_secret": "secret-key",
+    "server_url": "oss-cn-shenzhen.aliyuncs.com",
+    "bucket_name": "m5stack-timer-cam"
+}

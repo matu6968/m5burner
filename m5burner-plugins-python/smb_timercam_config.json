@@ -1,0 +1,12 @@
+{
+    "mode": "smb",
+    "wifi_ssid": "MyNetwork",
+    "wifi_pwd": "MyPassword",
+    "smb_host": "192.168.1.100",
+    "smb_user": "username",
+    "smb_pwd": "password",
+    "smb_path": "camera/images",
+    "pic_name": "img",
+    "size": 14,
+    "interval": 5
+}
