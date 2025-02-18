@@ -3,7 +3,7 @@
 A utility used to flash [M5 Stack devices](https://m5stack.com/) with M5Stack's own firmware (some require an account to download them) or community firmware made by others.
 
 Changes in this version:
-- Newer Electron build (16.0.7 -> 35.0.0-beta.2)
+- Newer Electron build (16.0.7 -> 35.0.0-beta.7)
 - Newer version of [esptool.py](https://github.com/espressif/esptool) (4.7-dev -> 4.8.1)
 - Migrate to newer [node-usb](https://github.com/node-usb/node-usb) library from the legacy [node-usb-detection](https://github.com/MadLittleMods/node-usb-detection) and [node-usb-native](https://github.com/VSChina/serialport.node) libraries
 
