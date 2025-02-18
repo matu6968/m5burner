@@ -1,0 +1,13 @@
+{
+    "server": "http://uiflow2.m5stack.com",
+    "wifi_networks": [
+        {"ssid": "Primary", "password": "pass1"},
+        {"ssid": "Backup", "password": "pass2"},
+        {"ssid": "Emergency", "password": "pass3"}
+    ],
+    "sntp0": "pool.ntp.org",
+    "sntp1": "time.google.com",
+    "sntp2": "time.windows.com",
+    "timezone": "UTC-8",
+    "bootOpt": 1
+}

@@ -229,3 +229,6 @@ python3 main.py --config-type timercam_smb --input config.json --output timercam
 # for TimerCam Aliyun OSS (Object Storage Service) configuration
 python3 main.py --config-type timercam_aliyun --input config.json --output timercam-aliyun.cfg # replace config.json with different name if your filename is different
 ```
+
+# Programatic usage
+You can use the API's provided within this program to integrate it directly in your Python program, a sample usage of the API functions is provided as m5burner-plugin-api-sample.py. 

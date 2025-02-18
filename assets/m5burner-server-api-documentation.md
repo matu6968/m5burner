@@ -4,6 +4,8 @@ The endpoints in the app have activities such as user authentication, firmware l
 
 You can use these endpoints from another client (for example, a web client or a standalone script) by sending HTTP requests with the appropriate method, headers, and payload based off the schema below.
 
+Assume all requests mentioned here returned a 200 status code unless specified.
+
 ---
 
 ## 1. Authentication & Account Endpoints
@@ -36,7 +38,7 @@ You can use these endpoints from another client (for example, a web client or a 
   - On successful login, the server returns a status code of 200 and sets a cookie (named `m5_auth_token`) in the response headers (like this: `Set-Cookie: m5_auth_token=********************************; expires=Tue, 06 May 2025 18:10:22 GMT; path=/`. In subsequent requests, include this cookie for authenticated operations.  
   - If the user decides to set a profile picture (under the avatar JSON object response, which makes the field not a empty value), to obtain the set image you will need another GET request under the endpoint (https://community.m5stack.com) like this: https://community.m5stack.com/assets/uploads/profile/uid-228999/228999-profileavatar-1738866651678.png
 
--  **Response if server fails to authenticate the user credentials (JSON):**
+-  **Response if server fails to authenticate the user credentials (JSON, 401 status code):**
    ```json
    {
      "code": 401,
@@ -62,7 +64,7 @@ You can use these endpoints from another client (for example, a web client or a 
      "data": []
    }
    ```
--  **Response if server fails to verify the login token (JSON):**
+-  **Response if server fails to verify the login token (JSON, 400 status code):**
    ```json
    {
 	"code": 400,
@@ -326,8 +328,25 @@ The base URL for admin-related firmware operations is set using a variable in th
      ]
    }
    ```
+-  **Response if the firmware field in the multi-part body is missing (JSON, 400 status code):**
+  ```json
+  {
+    "error": "Invalid parameters.",
+    "errMsg": "Missing required file(s)."
+  }
+  ```
+
+-  **Response if the required fields (name, device category, version) in the multi-part body are missing (JSON, 400 status code):**
+  ```json
+  {
+    "error": "Invalid parameters.",
+    "errMsg": "Name, version and type of device are required."
+  }
+  ```
+
 - **Notes:**  
-  - The category field can be any of one of those entries: `core`, `core2 & tough`, `cores3`, `stickc`, `stickv & unity`, `t-lite`, `atom`, `atoms3`, `timercam`, `paper`, `coreink`, `stamp`, `stamps3`, `capsule`, `dial`, `airq`, `cardputer`, `dinmeter`, `nanoc6`, `station`
+  - The category field can be any of one of those entries: `core`, `core2 & tough`, `cores3`, `stickc`, `stickv & unity`, `t-lite`, `atom`, `atoms3`, `timercam`, `paper`, `coreink`, `stamp`, `stamps3`, `capsule`, `dial`, `airq`, `cardputer`, `dinmeter`, `nanoc6`, `station`, `third party`
+  - The server does not care about matching entire case in the category field, it just cares if the server has text in that field or not, same thing for descriptions, as it can accept no description due to the length check and category picker being a client feature.
 
 - **Update Existing Firmware:**  
   **URL:**  
@@ -404,6 +423,28 @@ The base URL for admin-related firmware operations is set using a variable in th
     "version": "the_version_to_remove"
   }
   ```
+-  **Response if the server successfully deletes the specified firmware version (JSON):**
+   ```json
+   {
+     "status": 1,
+     "message": "success"
+   }
+   ```
+
+-  **Response if the server does not find the specified firmware version to delete (JSON):**
+   ```json
+   {
+     "status": 0,
+     "message": "Not found"
+   }
+   ```
+-  **Response if the payload is invalid (JSON, 400 status code):**
+   ```json
+   {
+     "error": "Invalid parameters.",
+     "errMsg": "`version` is a required field."
+   }
+   ```
 
 - **Publish/Unpublish Firmware:**  
   **Publish:**  
@@ -423,7 +464,7 @@ The base URL for admin-related firmware operations is set using a variable in th
    }
    ```
 
--  **If unpublishing fails (400 status code):**
+-  **If unpublishing fails (JSON, 400 status code):**
   ```json
   {
     "error": "Error",
@@ -431,7 +472,7 @@ The base URL for admin-related firmware operations is set using a variable in th
   }
   ```
 
--  **If publishing fails (400 status code):**
+-  **If publishing fails (JSON, 400 status code):**
   ```json
   {
     "error": "Error",
@@ -484,7 +525,7 @@ The base URL for admin-related firmware operations is set using a variable in th
      "message": "success"
    }
    ```
--  **General admin response with 401 status code if no token/invalid token was provided during those requests (JSON):**
+-  **General admin response with 401 status code if no token/invalid token was provided during those requests (JSON, 401 status code):**
    ```json
    {
      "error": "Unauthorized",
@@ -557,7 +598,7 @@ The base URL for admin-related firmware operations is set using a variable in th
   }
   ```
 
-- **Response if failed m5_auth_token (auth token) is invalid with a 401 status code:**
+- **Response if m5_auth_token (auth token) is invalid (JSON, 401 status code):**
    ```json
    {
      "error": "Unauthorized",
@@ -583,7 +624,7 @@ The base URL for admin-related firmware operations is set using a variable in th
     }
   }
   ```
-  - If the share code is invalid, you will receive this response:
+  - If the share code is invalid, you will receive this response with a 400 status code:
   ```json
   {
     "error": "Not found",
@@ -609,9 +650,35 @@ All device-related endpoints (except the old device registry) use the same host 
 - **URL:**  
   `GET https://uiflow2.m5stack.com/api/v1/device/{mac}/binding`
 
-- **Notes:**  
-  Replace `{mac}` with the device’s MAC address.
+- If the device's MAC address is invalid, it will return a 404 status code with no response.
 
+- If the device's MAC address is valid but incompatible (example: a M5StickC Plus2 device), you will receive the following response with a 400 status code:
+
+```json
+{
+  "code": 400,
+  "data": {
+    "message": "Invalid chip"
+  }
+}
+```
+- If the device's MAC address is both valid and compatible you will see this response: (JSON)
+```json
+{
+  "code": 200,
+  "data": {
+    "state": 0,
+    "public": 0
+  }
+}
+```
+
+- **Notes:**  
+  - Replace `{mac}` with the device’s MAC address.
+  - If the device is not binded, then `state` will be set to 0 and your client needs to show a binding prompt before usage on UIFlow2.
+  - If the device is not set as public in the bind settings the `public` state will be set to 0.
+
+ 
 ### Check Old Device Binding
 
 - **URL:**  
@@ -622,6 +689,23 @@ All device-related endpoints (except the old device registry) use the same host 
   Cookie: token=<ssoToken>
   ```
 
+- **Response if it was successful:**
+  ```json
+  {
+     "code": 200,
+     "msg": "",
+     "data": null
+  }
+  ```
+- **Response if token is not provided or is invalid:**
+  ```json
+  {
+     "code": 500,
+     "msg": "未提供Token",
+     "data": null
+  }
+  ```
+
 ### Register an Old Device
 
 - **URL:**  
@@ -630,6 +714,7 @@ All device-related endpoints (except the old device registry) use the same host 
 - **Headers:**
   ```
   Authorization: Basic bTVzdGFjay5tNWJ1cm5lcjpyZWdpc3RyeQ==
+  (decoded output from authorization header is this: m5stack.m5burner:registry)
   Content-Type: application/x-www-form-urlencoded
   ```
 
@@ -653,7 +738,14 @@ All device-related endpoints (except the old device registry) use the same host 
   {
     "name": "Device Name",
     "mac": "DEVICE_MAC_ADDRESS",
-    "public": true
+    "public": 1
+  }
+  ```
+- Response if binding was successful:
+  ```json
+  {
+    "status": 200,
+    "data": {}
   }
   ```
 
@@ -674,25 +766,295 @@ All device-related endpoints (except the old device registry) use the same host 
   }
   ```
 
-### Update a Device
+### Update a Device 
+
+(allows setting device state to public, private, token needed or changing device name, this is a endpoint not used in M5Burner but general UIFlow2 device management)
 
 - **URL:**  
-  `POST https://uiflow2.m5stack.com/api/v1/device/update`
+  `PUT https://uiflow2.m5stack.com/m5stack/api/v2/device/updateDevice`
 
-- **Headers:**
+- **Headers:**  
   ```
-  Cookie: m5_auth_token=<your_token_here>
+  Cookie: token=<ssoToken>
   ```
-
 - **Payload Example:**
   ```json
   {
-    "name": "New Device Name",
-    "mac": "DEVICE_MAC_ADDRESS",
-    "public": false
+    "category": 1,
+    "deviceId": "UIFLOW_DEVICE_ID",
+    "deviceName": "dev-<by-default-macaddress>"
   }
   ```
 
+- Response if device update was successful:
+  ```json
+  {
+    "code": 200,
+    "msg": "",
+    "data": null
+  }
+  ```
+
+- Response if device update has failed:
+  ```json
+  {
+    "code": 500,
+    "msg": "操作失败: null",
+    "data": null
+  }
+  ```
+- **Notes:**  
+  - `category` can be set to set to the following: `0 - private`, `1 - token required`, `2 - public`
+
+### Check detailed device list
+
+(this is a endpoint not used in M5Burner but general UIFlow2 device management)
+
+- **URL:**  
+  `GET https://uiflow2.m5stack.com/m5stack/api/v2/device/list`
+
+- **Headers:**  
+  ```
+  Cookie: token=<ssoToken>
+  ```
+
+- Response if it was successful (device in public state):
+  ```json
+  {
+      "code": 200,
+      "msg": "",
+      "data": {
+          "myDevice": {
+              "privateDeviceList": [],
+              "tokenDeviceList": [],
+              "publicDeviceList": [
+                  {
+                      "deviceId": 1234567890112345,
+                      "mac": "<macAddress>",
+                      "deviceName": "dev-<macAddress>",
+                      "type": "<deviceType>",
+                      "category": "2",
+                      "deviceKey": "<deviceKey>",
+                      "status": "0",
+                      "delFlag": "0",
+                      "version": "V2.2.1"
+                  }
+              ]
+          },
+          "otherDevice": {
+              "tokenDeviceList": [],
+              "publicDeviceList": []
+          }
+      }
+  }
+  ```
+
+- Response if it was successful (device in private state):
+  ```json
+  {
+      "code": 200,
+      "msg": "",
+      "data": {
+          "myDevice": {
+              "privateDeviceList": [
+                  {
+                      "deviceId": 1234567890112345,
+                      "mac": "<macAddress>",
+                      "deviceName": "dev-<macAddress>",
+                      "type": "cardputer",
+                      "category": "0",
+                      "deviceKey": "<deviceKey>",
+                      "status": "0",
+                      "delFlag": "0",
+                      "version": "V2.2.1"
+                  }
+              ],
+              "tokenDeviceList": [],
+              "publicDeviceList": []
+          },
+          "otherDevice": {
+              "tokenDeviceList": [],
+              "publicDeviceList": []
+          }
+      }
+  }
+  ```
+- Response if it was successful (device in state where it requires a token to use):
+  ```json
+  {
+      "code": 200,
+      "msg": "",
+      "data": {
+          "myDevice": {
+              "privateDeviceList": [],
+              "tokenDeviceList": [
+                  {
+                      "deviceId": 1234567890112345,
+                      "mac": "<macAddress>",
+                      "deviceName": "dev-<macAddress>",
+                      "type": "cardputer",
+                      "category": "1",
+                      "deviceKey": "<deviceKey>",
+                      "status": "0",
+                      "delFlag": "0",
+                      "version": "V2.2.1"
+                  }
+              ],
+              "publicDeviceList": []
+          },
+          "otherDevice": {
+              "tokenDeviceList": [],
+              "publicDeviceList": []
+          }
+      }
+  }
+  ```
+
+- Response if it was successful (shared device in public state):
+  ```json
+  {
+      "code": 200,
+      "msg": "",
+      "data": {
+          "myDevice": {
+              "privateDeviceList": [],
+              "tokenDeviceList": [],
+              "publicDeviceList": []
+          },
+          "otherDevice": {
+              "tokenDeviceList": [],
+              "publicDeviceList": [
+                  {
+                      "deviceId": 1234567890112345,
+                      "mac": "<macAddress>",
+                      "deviceName": "dev-<macAddress>",
+                      "type": "cardputer",
+                      "category": "2",
+                      "deviceKey": "<deviceKey>",
+                      "status": "0",
+                      "delFlag": "0",
+                      "version": "V2.2.1"
+                  }
+              ]
+          }
+      }
+  }
+  ```
+- Response if it was successful (shared device in state where it requires a token):
+  ```json
+  {
+      "code": 200,
+      "msg": "",
+      "data": {
+          "myDevice": {
+              "privateDeviceList": [],
+              "tokenDeviceList": [],
+              "publicDeviceList": []
+          },
+          "otherDevice": {
+              "tokenDeviceList": [
+                  {
+                      "deviceId": 1234567890112345,
+                      "mac": "<macAddress>",
+                      "deviceName": "dev-<macAddress>",
+                      "type": "cardputer",
+                      "category": "1",
+                      "deviceKey": "<deviceKey>",
+                      "status": "0",
+                      "delFlag": "0",
+                      "version": "V2.2.1"
+                  }
+              ],
+              "publicDeviceList": []
+          }
+      }
+  }
+  ```
+
+- **Notes:**  
+  - If `status` is set to 0, then the device is online, otherwaise if it's set to 1 then it is offline.
+  - The `category` state gets changed depending on device state (0 if the device is in a private state, 1 if the device requires a token to use, and 2 if the device in a public state)
+  - If the device is in a private state or requires a token, then the device properties gets moved to `privateDeviceList` or to `tokenDeviceList` accordingly. This is the same with shared devices except private devices can't be shared.
+  - If the device is no longer available to be used (because the device in the bind settings got changed to private) then `delFlag` state will be set to 1.
+  - To get the UIFlow version that is ran on the device, refer to getting `version` in the response JSON objects.
+
+### Bind a shared device
+
+(this is a endpoint not used in M5Burner but general UIFlow2 device management)
+
+- **URL:**  
+  `POST https://uiflow2.m5stack.com/m5stack/api/v2/device/mac`
+
+- **Headers:**  
+  ```
+  Cookie: token=<ssoToken>
+  ```
+  - **Payload Example:**
+  ```
+  Multi-part body:
+  mac: <macAddress>
+  ```
+- Response if shared device bind was successful:
+  ```json
+  {
+    "code": 200,
+    "msg": "",
+    "data": null
+  }
+  ```
+
+- Response if shared device bind has failed for a unknown reason:
+  ```json
+  {
+    "code": 500,
+    "msg": "操作失败: null",
+    "data": null
+  }
+  ```
+
+- Response if shared device bind has failed for due to binding a private device:
+  ```json
+  {
+    "code": 10002,
+    "msg": "该设备不是公共设备",
+    "data": null
+  }
+  ```
+
+
+### Unbind a shared device
+
+(this is a endpoint not used in M5Burner but general UIFlow2 device management)
+
+- **URL:**  
+  `DELETE https://uiflow2.m5stack.com/m5stack/api/v2/device/removeOthersPublicDevice`
+
+- **Headers:**  
+  ```
+  Cookie: token=<ssoToken>
+  ```
+  - **Payload Example:**
+  ```
+  Multi-part body:
+  mac: <macAddress>
+  ```
+- Response if shared device unbind was successful:
+  ```json
+  {
+    "code": 200,
+    "msg": "",
+    "data": null
+  }
+  ```
+
+- Response if shared device unbind has failed:
+  ```json
+  {
+    "code": 500,
+    "msg": "操作失败: null",
+    "data": null
+  }
+  ```
 ---
 
 ## 6. Media Token Endpoint
@@ -707,6 +1069,20 @@ All device-related endpoints (except the old device registry) use the same host 
   {
     "mac": "DEVICE_MAC_ADDRESS"
   }
+  ```
+- **Response if MAC address format is valid (JSON):**
+  ```json
+  "001122334455d32a6890f2d619cced97"
+  ```
+
+- **Response if MAC address format is invalid (JSON):**
+  ```json
+  "Mac addr format error"
+  ```
+
+- **Response if the JSON payload is invalid (JSON):**
+  ```json
+  "Data type error"
   ```
 
 - **Notes:**  
@@ -779,5 +1155,8 @@ When integrating these API calls into another client (for example, in a Node.js 
 
 5. **Caching and Versioning:**  
    – Notice the use of timestamp query parameters in file download URLs (e.g., `...?v=timestamp`) to bypass caches during downloads.
+
+6. **Additional configuration for certain firmware:**
+   - Some firmware (mostly ones made by M5Stack) require additional configuration before it can be used (such as UIFlow2 or TimerCam). In those situations, refer to the [additional configuration for certain firmware page](https://github.com/matu6968/m5burner/wiki/additional-m5stack-firmware-configuration) of the wiki.
 
 ---

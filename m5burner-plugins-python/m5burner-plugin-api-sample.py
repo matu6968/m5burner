@@ -84,7 +84,7 @@ def main():
 
     # Example 7: UIFlow2 NVS Configuration with multiple networks
     uiflow2_config = {
-        'server': 'http://flow.m5stack.com',
+        'server': 'http://uiflow2.m5stack.com',
         'wifi_networks': [
             {'ssid': 'PrimaryWiFi', 'password': 'PrimaryPass'},
             {'ssid': 'BackupWiFi', 'password': 'BackupPass'}
@@ -98,7 +98,28 @@ def main():
     addr, path = config_gen.create_uiflow2_nvs_config(uiflow2_config, "output/uiflow2.bin")
     print(f"UIFlow2 NVS config created at: {path} (address: {addr})")
 
-    # Example 8: Read UIFlow Configuration
+    # Example 8: UIFlow2 NVS Configuration with multiple networks and combined base firmware image
+    # Note: This requires the firmware image to be present under output/uiflow2-base.bin before running this example
+    uiflow2_config = {
+        'server': 'http://uiflow2.m5stack.com',
+        'wifi_networks': [
+            {'ssid': 'PrimaryWiFi', 'password': 'PrimaryPass'},
+            {'ssid': 'BackupWiFi', 'password': 'BackupPass'}
+        ],
+        'sntp0': 'pool.ntp.org',
+        'sntp1': 'time.google.com',
+        'sntp2': 'time.windows.com',
+        'timezone': 'UTC-8',
+        'bootOpt': 1
+    }
+    addr, path = config_gen.create_uiflow2_nvs_config(
+        uiflow2_config, 
+        firmware_path="output/uiflow2-base.bin", 
+        output_path="output/uiflow2-combined.bin"
+    )
+    print(f"UIFlow2 combined image created at: {path} (address: {addr})")
+
+    # Example 9: Read UIFlow Configuration
     try:
         config = config_gen.read_uiflow_config("output/uiflow.cfg")
         print("Read UIFlow config:", json.dumps(config, indent=2))

@@ -23,17 +23,27 @@ class ConfigGenerator:
         
         This creates a simple WiFi configuration in the UIFlow format.
         The format is:
-        - 1 byte for SSID length
+        - 1 byte for SSID length (max 49 characters, though SSID can only have 32 characters maximum)
         - SSID bytes
         - 1 byte SSID CRC
         - 49 bytes padding
-        - 1 byte for password length
+        - 1 byte for password length (max 49 characters)
         - password bytes
         - 1 byte password CRC
         - remaining bytes filled with 0xFF
         """
         ssid = options['wifi_ssid']
         password = options['wifi_password']
+        
+        # Validate SSID and password lengths for UIFlow
+        if len(ssid) > 32:
+            raise ValueError("UIFlow WiFi SSID cannot be longer than 32 characters")
+        if len(ssid) < 1:
+            raise ValueError("WiFi SSID cannot be empty")
+        if len(password) < 8:
+            raise ValueError("WiFi password must be at least 8 characters")
+        if len(password) > 49:
+            raise ValueError("UIFlow WiFi password cannot be longer than 49 characters")
         
         ssid_bytes = ssid.encode()
         pwd_bytes = password.encode()
@@ -63,7 +73,22 @@ class ConfigGenerator:
         return output_path
 
     def create_wifi_config(self, ssid, password, address="0x3ff000", output_path=None):
-        """Create WiFi configuration file"""
+        """Create WiFi configuration file
+        
+        Standard WiFi configuration with standard length limits:
+        - SSID: 1-32 characters
+        - Password: 8-63 characters
+        """
+        # Validate SSID and password lengths
+        if len(ssid) > 32:
+            raise ValueError("WiFi SSID cannot be longer than 32 characters")
+        if len(ssid) < 1:
+            raise ValueError("WiFi SSID cannot be empty")
+        if len(password) < 8:
+            raise ValueError("WiFi password must be at least 8 characters")
+        if len(password) > 63:
+            raise ValueError("WiFi password cannot be longer than 63 characters")
+        
         ssid_bytes = ssid.encode()
         pwd_bytes = password.encode()
         
@@ -88,17 +113,46 @@ class ConfigGenerator:
             
         return address, str(output_path)
 
-    def create_uiflow2_nvs_config(self, config, output_path=None):
-        """Create UIFlow2 NVS configuration file"""
+    def create_uiflow2_nvs_config(self, config, output_path=None, firmware_path=None):
+        """Create UIFlow2 NVS configuration file
+        
+        Args:
+            config: Configuration dictionary with WiFi and other settings
+            output_path: Path for output file
+            firmware_path: Optional path to UIFlow2 firmware to create combined image
+        
+        WiFi configuration with standard length limits:
+        - SSID: 1-32 characters
+        - Password: 8-63 characters
+        
+        Returns:
+            tuple: (address, output_path)
+        """
         # Handle optional WiFi networks
         wifi_networks = config.get('wifi_networks', [])
         if len(wifi_networks) > 3:
             raise ValueError("Maximum of 3 WiFi networks supported")
 
+        # Validate WiFi credentials
+        for i, network in enumerate(wifi_networks):
+            ssid = network.get('ssid', '')
+            password = network.get('password', '')
+            
+            if ssid:  # Only validate if SSID is provided
+                if len(ssid) > 32:
+                    raise ValueError(f"WiFi SSID for network {i+1} cannot be longer than 32 characters")
+                if len(ssid) < 1:
+                    raise ValueError(f"WiFi SSID for network {i+1} cannot be empty")
+                if len(password) < 8:
+                    raise ValueError(f"WiFi password for network {i+1} must be at least 8 characters")
+                if len(password) > 63:
+                    raise ValueError(f"WiFi password for network {i+1} cannot be longer than 63 characters")
+
         # Ensure we have 3 networks (empty if not provided)
         while len(wifi_networks) < 3:
             wifi_networks.append({"ssid": "", "password": ""})
 
+        # Create CSV content
         csv_content = f"""key,type,encoding,value
 uiflow,namespace,,
 server,data,string,{config['server']}
@@ -114,17 +168,60 @@ sntp2,data,string,{config['sntp2']}
 tz,data,string,{config['timezone']}
 boot_option,data,u8,{config['bootOpt']}"""
 
+        # Write CSV file
         csv_path = self.tmp_dir / 'uiflow2.csv'
         with open(csv_path, 'w') as f:
             f.write(csv_content)
 
-        if output_path is None:
-            output_path = self.tmp_dir / 'uiflow2-cfg.bin'
-
+        # Set output path for NVS binary
+        nvs_path = self.tmp_dir / 'uiflow2-nvs.bin'
+        
+        # Generate NVS partition
         subprocess.run(['python', 'nvs_partition_gen.py', 'generate', 
-                       str(csv_path), str(output_path), '0x6000'])
+                       str(csv_path), str(nvs_path), '0x6000'])
+
+        # If firmware path is provided, create combined image
+        if firmware_path:
+            if not os.path.exists(firmware_path):
+                raise ValueError(f"UIFlow2 firmware file not found: {firmware_path}")
+
+            if output_path is None:
+                output_path = self.tmp_dir / 'uiflow2-combined.bin'
             
-        return "0x9000", str(output_path)
+            # Read the firmware
+            with open(firmware_path, 'rb') as f:
+                firmware_data = f.read()
+            
+            # Read the NVS partition
+            with open(nvs_path, 'rb') as f:
+                nvs_data = f.read()
+            
+            # Create combined image:
+            # - Original firmware up to NVS offset (0x9000)
+            # - NVS partition (0x6000 bytes)
+            # - Remaining firmware data
+            nvs_offset = 0x9000
+            nvs_size = 0x6000
+            
+            combined = (
+                firmware_data[:nvs_offset] +  # Data before NVS
+                nvs_data +                    # NVS partition
+                firmware_data[nvs_offset + nvs_size:]  # Data after NVS
+            )
+            
+            # Write combined image
+            with open(output_path, 'wb') as f:
+                f.write(combined)
+            
+            return "0x0000", str(output_path)
+        else:
+            # If no firmware provided, just return the NVS partition
+            if output_path:
+                os.rename(nvs_path, output_path)
+            else:
+                output_path = nvs_path
+            
+            return "0x9000", str(output_path)
 
     def create_timercam_config(self, options, output_path=None):
         """Create TimerCam configuration file
@@ -222,6 +319,30 @@ boot_option,data,u8,{config['bootOpt']}"""
                     "8: 640x480\n11: 1280x720\n14: 1920x1080"
                 )
 
+        # Add WiFi credential validation
+        if mode in ['smb', 's3', 'rtsp']:
+            ssid = options['wifi_ssid']
+            password = options['wifi_pwd']
+            if len(ssid) > 32:
+                raise ValueError("WiFi SSID cannot be longer than 32 characters")
+            if len(ssid) < 1:
+                raise ValueError("WiFi SSID cannot be empty")
+            if len(password) < 8:
+                raise ValueError("WiFi password must be at least 8 characters")
+            if len(password) > 63:
+                raise ValueError("WiFi password cannot be longer than 63 characters")
+        elif mode in ['basic', 'aliyun']:
+            ssid = options['ssid']
+            password = options['pwd']
+            if len(ssid) > 32:
+                raise ValueError("WiFi SSID cannot be longer than 32 characters")
+            if len(ssid) < 1:
+                raise ValueError("WiFi SSID cannot be empty")
+            if len(password) < 8:
+                raise ValueError("WiFi password must be at least 8 characters")
+            if len(password) > 63:
+                raise ValueError("WiFi password cannot be longer than 63 characters")
+
         missing = [f for f in required_fields[mode] if f not in options]
         if missing:
             raise ValueError(f"Missing required fields for {mode} mode: {', '.join(missing)}")
@@ -303,6 +424,8 @@ def main():
                        help='Input file (JSON for config generation, binary for reading)')
     parser.add_argument('--output', required=True, 
                        help='Output file (binary for config generation, JSON for reading)')
+    parser.add_argument('--firmware', 
+                       help='Path to UIFlow2 firmware for combined NVS configuration')
     
     args = parser.parse_args()
     config_gen = ConfigGenerator()
@@ -332,7 +455,16 @@ def main():
             config = json.load(f)
 
         # Handle different config types
-        if args.config_type == 'uiflow':
+        if args.config_type == 'uiflow2_nvs':
+            addr, path = config_gen.create_uiflow2_nvs_config(
+                config, 
+                args.output,
+                firmware_path=args.firmware
+            )
+            print(f"UIFlow2 {'combined image' if args.firmware else 'NVS config'} created at: {path} (address: {addr})")
+            return
+
+        elif args.config_type == 'uiflow':
             required_fields = ['wifi_ssid', 'wifi_password']
             missing = [f for f in required_fields if f not in config]
             if missing:
