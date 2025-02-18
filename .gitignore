@@ -11,3 +11,7 @@ deps/tool/esptool/__pycache__/
 deps/tool/esptool/targets/__pycache__/
 deps/tool/intelhex/__pycache__/
 deps/tool/serial/__pycache__/
+M5Burner-*-*-*-*.zip
+M5Burner-*-*-*-*.dmg
+M5Burner-*-*-*.zip
+M5Burner-*-*-*.dmg

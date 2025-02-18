@@ -12,9 +12,9 @@ const getPlatformConfig = () => {
     
     if (platform === 'darwin') {
         return {
-            electronOutput: ARCH === 'x64' ? 'dist/mac/M5Burner.app/Contents/Resources/app' : `dist/mac-${ARCH}/M5Burner.app/Contents/Resources/app`,
+            electronOutput: ARCH === 'x64' ? 'dist/mac/M5Burner.app' : `dist/mac-${ARCH}/M5Burner.app`,
             outputDir: `m5stack-${ARCH}.app`,
-            electronBuildCmd: 'electron-builder --mac dmg',
+            electronBuildCmd: 'electron-builder --mac dmg --config electron-builder.config.js',
             needsResourcesCopy: true
         };
     } else if (platform === 'win32') {
@@ -74,6 +74,9 @@ const PYTHON_UTILITIES = [
         output: 'gen_esp32part'
     }
 ];
+
+// Add at the top with other constants
+const TEMP_BUILD_DIR = path.resolve('.temp-build');
 
 // Helper function to run shell commands
 function runCommand(command) {
@@ -252,30 +255,49 @@ function generateTimestampVersion() {
     return `${year}${month}${day}${hour}${minute}`;
 }
 
-// Create zip archive
+// Create zip archive or move DMG for macOS
 function createZipArchive(sourceDir, version, gitHash) {
     const platform = process.platform === 'win32' ? 'win' : 
                     process.platform === 'darwin' ? 'mac' : `linux-${ARCH}`;
     
-    // Construct zip filename
-    let zipName = `M5Burner-${version}-${platform}`;
+    // Construct filename
+    let fileName = `M5Burner-${version}-${platform}`;
     if (gitHash) {
-        zipName += `-${gitHash}`;
+        fileName += `-${gitHash}`;
     }
-    zipName += '.zip';
 
-    console.log(`Creating zip archive: ${zipName}`);
-    
-    // Use system zip command
-    const zipCommand = process.platform === 'win32' ?
-        `powershell Compress-Archive -Path "${sourceDir}/*" -DestinationPath "${zipName}" -Force` :
-        `zip -r "${zipName}" "${sourceDir}"/*`;
-    
-    try {
-        execSync(zipCommand);
-        console.log(`Successfully created ${zipName}`);
-    } catch (error) {
-        console.error('Failed to create zip archive:', error);
+    if (process.platform === 'darwin') {
+        // For macOS, move and rename the DMG from electron-builder
+        const archSuffix = ARCH === 'arm64' ? '-arm64' : '';
+        const sourceDmg = path.join('dist', `m5burner-${version}${archSuffix}.dmg`); // electron-builder's DMG
+        const targetDmg = `${fileName}.dmg`;
+        
+        console.log(`Moving and renaming DMG to: ${targetDmg}`);
+        try {
+            if (fs.existsSync(sourceDmg)) {
+                fs.renameSync(sourceDmg, targetDmg);
+                console.log(`Successfully moved and renamed DMG to ${targetDmg}`);
+            } else {
+                console.error('Source DMG not found:', sourceDmg);
+            }
+        } catch (error) {
+            console.error('Failed to move/rename DMG:', error);
+        }
+    } else {
+        // For other platforms, create zip as before
+        fileName += '.zip';
+        console.log(`Creating zip archive: ${fileName}`);
+        
+        const zipCommand = process.platform === 'win32' ?
+            `powershell Compress-Archive -Path "${sourceDir}/*" -DestinationPath "${fileName}" -Force` :
+            `zip -r "${fileName}" "${sourceDir}"/*`;
+        
+        try {
+            execSync(zipCommand);
+            console.log(`Successfully created ${fileName}`);
+        } catch (error) {
+            console.error('Failed to create zip archive:', error);
+        }
     }
 }
 
@@ -283,9 +305,34 @@ function createZipArchive(sourceDir, version, gitHash) {
 (function main() {
     console.log('Starting the build and packaging process...');
 
+    // Create temp build directory
+    cleanUp(TEMP_BUILD_DIR);
+    createFolder(TEMP_BUILD_DIR);
+    createFolder(path.join(TEMP_BUILD_DIR, 'packages'));
+    createFolder(path.join(TEMP_BUILD_DIR, 'packages', 'tool'));
+
+    // Generate and write appVersion.info to temp directory
+    const timestampVersion = generateTimestampVersion();
+    const tempAppVersionPath = path.join(TEMP_BUILD_DIR, 'packages', 'appVersion.info');
+    console.log('Creating temporary appVersion.info...');
+    fs.writeFileSync(tempAppVersionPath, timestampVersion);
+
+    // Compile and copy NVS tool to temp directory for macOS
+    if (process.platform === 'darwin') {
+        console.log('Compiling ESP NVS tool with PyInstaller...');
+        runCommand(PYINSTALLER_CMD);
+        if (fs.existsSync(PYINSTALLER_BINARY)) {
+            const tempNvsPath = path.join(TEMP_BUILD_DIR, 'packages', 'tool', 'nvs');
+            fs.copyFileSync(PYINSTALLER_BINARY, tempNvsPath);
+        }
+    }
+
     // Step 1: Run electron-builder
     console.log('Running Electron Builder...');
     runCommand(ELECTRON_BUILD_CMD);
+
+    // Clean up temp directory
+    cleanUp(TEMP_BUILD_DIR);
 
     // Step 2: Compile Python utilities on Windows
     if (process.platform === 'win32') {
@@ -317,8 +364,13 @@ function createZipArchive(sourceDir, version, gitHash) {
         process.exit(1);
     }
 
-    const targetDir = process.platform === 'darwin' ? MACOS_RESOURCES_DIR : BIN_DIR;
-    fs.cpSync(ELECTRON_OUTPUT, targetDir, { recursive: true });
+    if (process.platform === 'darwin') {
+        // For macOS, copy the entire .app bundle structure
+        fs.cpSync(ELECTRON_OUTPUT, OUTPUT_DIR, { recursive: true });
+    } else {
+        const targetDir = BIN_DIR;
+        fs.cpSync(ELECTRON_OUTPUT, targetDir, { recursive: true });
+    }
 
     // Step 6: Copy dependency directory files
     const depsTargetDir = process.platform === 'darwin' ? 
@@ -326,12 +378,12 @@ function createZipArchive(sourceDir, version, gitHash) {
     
     console.log(`Copying dependencies from ${BUILD_DIR} to ${depsTargetDir}...`);
     if (fs.existsSync(BUILD_DIR)) {
+        // Create the target directory if it doesn't exist
+        createFolder(depsTargetDir);
+        
         if (process.platform === 'win32') {
             // On Windows, only copy directories that aren't Python-related
             const dirsToExclude = ['esptool', 'intelhex', 'serial', '__pycache__', 'tool'];
-            
-            // Create the target directory
-            createFolder(depsTargetDir);
             
             // Copy only non-excluded directories
             fs.readdirSync(BUILD_DIR).forEach(item => {
@@ -367,12 +419,6 @@ function createZipArchive(sourceDir, version, gitHash) {
         }
     }
 
-    // Step 8: For macOS, create DMG
-    if (process.platform === 'darwin') {
-        console.log('Creating DMG file...');
-        runCommand('create-dmg "m5stack-${ARCH}.app" dist/ || true');  // || true because create-dmg returns non-zero on warnings
-    }
-
     // Step 9: Copy the M5Burner startup script from the build directory to the root of the architecture folder if running on Windows or Linux
     if (process.platform === 'win32') {
         console.log(`Copying M5Burner startup binary from build directory to root of ${OUTPUT_DIR}...`);
@@ -395,13 +441,6 @@ function createZipArchive(sourceDir, version, gitHash) {
     } else {
         console.log('You are not running Linux or Windows, skipping startup script/binary copy');
     }
-    
-    // Generate and write appVersion.info
-    const timestampVersion = generateTimestampVersion();
-    const appVersionPath = path.join(PACKAGES_DIR, 'appVersion.info');
-    
-    console.log('Creating appVersion.info...');
-    fs.writeFileSync(appVersionPath, timestampVersion);
     
     // Check if --new-release flag is present
     if (process.argv.includes('--new-release')) {

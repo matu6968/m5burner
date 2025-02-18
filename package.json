@@ -20,6 +20,9 @@
     "electron": "35.0.0-beta.7",
     "electron-builder": "^25.1.8"
   },
+  "resolutions": {
+    "macos-alias": "npm:@napi-rs/macos-alias@latest"
+  },
   "scripts": {
     "postpackage": "electron-rebuild clean",
     "nvsbuild": "pyinstaller --onefile esp-idf-nvs-partition-gen/esp_idf_nvs_partition_gen/nvs_partition_gen.py && mv /dist/nvs_partition_gen nvs && cp dist/nvs .",
