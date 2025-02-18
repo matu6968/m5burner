@@ -4,6 +4,11 @@ build/kflash
 build/gen_esp32part
 dist
 m5stack-*
+m5burner-x64*
+m5burner-arm*
+m5burner-arm64*
+m5burner-x64*.app
+m5burner-arm64*.app
 node_modules
 yarn.lock
 deps/tool/serial/tools/__pycache__/

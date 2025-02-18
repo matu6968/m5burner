@@ -20,7 +20,7 @@
     "electron": "35.0.0-beta.7",
     "electron-builder": "^25.1.8"
   },
-  "resolutions": {
+  "optionalDependencies": {
     "macos-alias": "npm:@napi-rs/macos-alias@latest"
   },
   "scripts": {

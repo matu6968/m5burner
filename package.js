@@ -13,14 +13,14 @@ const getPlatformConfig = () => {
     if (platform === 'darwin') {
         return {
             electronOutput: ARCH === 'x64' ? 'dist/mac/M5Burner.app' : `dist/mac-${ARCH}/M5Burner.app`,
-            outputDir: `m5stack-${ARCH}.app`,
+            outputDir: `m5burner-${ARCH}.app`,
             electronBuildCmd: 'electron-builder --mac dmg --config electron-builder.config.js',
             needsResourcesCopy: true
         };
     } else if (platform === 'win32') {
         return {
             electronOutput: ARCH === 'x64' ? 'dist/win-unpacked' : `dist/win-${ARCH}-unpacked`,
-            outputDir: `m5stack-${ARCH}`,
+            outputDir: `m5burner-${ARCH}`,
             electronBuildCmd: 'electron-builder --win',
             needsResourcesCopy: false
         };
@@ -28,7 +28,7 @@ const getPlatformConfig = () => {
         // Linux
         return {
             electronOutput: ARCH === 'x64' ? 'dist/linux-unpacked' : `dist/linux-${ARCH}-unpacked`,
-            outputDir: `m5stack-${ARCH}`,
+            outputDir: `m5burner-${ARCH}`,
             electronBuildCmd: 'electron-builder --linux',
             needsResourcesCopy: false
         };
@@ -77,6 +77,10 @@ const PYTHON_UTILITIES = [
 
 // Add at the top with other constants
 const TEMP_BUILD_DIR = path.resolve('.temp-build');
+
+// Add these constants near the top with other constants
+const LINUX_LAUNCHER_SOURCE = path.resolve('assets/linux-launcher/m5burner-launcher-linux.c');
+const LINUX_LAUNCHER_OUTPUT = path.resolve('assets/linux-launcher/m5burner-launcher');
 
 // Helper function to run shell commands
 function runCommand(command) {
@@ -301,9 +305,35 @@ function createZipArchive(sourceDir, version, gitHash) {
     }
 }
 
+// Add this function after other helper functions
+function compileLauncherForLinux() {
+    if (process.platform !== 'linux') return;
+
+    console.log('Compiling Linux launcher...');
+    const compileCommand = 'gcc -o ' + 
+                          `"${LINUX_LAUNCHER_OUTPUT}" ` +
+                          `"${LINUX_LAUNCHER_SOURCE}" ` +
+                          '`pkg-config --cflags --libs libnotify` ' +
+                          '-Wall -O2';
+    
+    try {
+        execSync(compileCommand, { stdio: 'inherit' });
+        console.log('Linux launcher compiled successfully');
+        
+        // Make the launcher executable
+        fs.chmodSync(LINUX_LAUNCHER_OUTPUT, '755');
+    } catch (err) {
+        console.error('Failed to compile Linux launcher:', err);
+        process.exit(1);
+    }
+}
+
 // Main script
 (function main() {
     console.log('Starting the build and packaging process...');
+
+    // Add this line early in the process
+    compileLauncherForLinux();
 
     // Create temp build directory
     cleanUp(TEMP_BUILD_DIR);
@@ -430,13 +460,14 @@ function createZipArchive(sourceDir, version, gitHash) {
             console.warn(`File to copy not found: ${STARTUP_BINARY_WINDOWS}`);
         }
     } else if (process.platform === 'linux') {
-        console.log(`Copying M5Burner startup script from build directory to root of ${OUTPUT_DIR}...`);
-        if (fs.existsSync(STARTUP_SCRIPT_LINUX)) {
-            const destinationPath = path.join(OUTPUT_DIR, path.basename(STARTUP_SCRIPT_LINUX));
-            fs.copyFileSync(STARTUP_SCRIPT_LINUX, destinationPath);
-            console.log(`Copied file to: ${destinationPath}`);
+        console.log(`Copying M5Burner launcher from build directory to root of ${OUTPUT_DIR}...`);
+        if (fs.existsSync(LINUX_LAUNCHER_OUTPUT)) {
+            const destinationPath = path.join(OUTPUT_DIR, 'M5Burner');
+            fs.copyFileSync(LINUX_LAUNCHER_OUTPUT, destinationPath);
+            fs.chmodSync(destinationPath, '755');
+            console.log(`Copied launcher to: ${destinationPath}`);
         } else {
-            console.warn(`File to copy not found: ${STARTUP_SCRIPT_LINUX}`);
+            console.warn(`Compiled launcher not found: ${LINUX_LAUNCHER_OUTPUT}`);
         }
     } else {
         console.log('You are not running Linux or Windows, skipping startup script/binary copy');

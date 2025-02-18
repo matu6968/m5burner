@@ -16,6 +16,10 @@ cd m5burner
 yarn install
 yarn install appdmg # only needed for making .dmg files and MacOS compatible only dependency
 pip install pyinstaller
+sudo apt install libnotify-dev # on Ubuntu/Debian systems
+sudo pacman -S libnotify # on Arch Linux systems
+sudo dnf install libnotify # on Fedora systems
+sudo zypper install libnotify # on openSUSE systems
 ```
 2. Recompile native dependencies
 ```bash
