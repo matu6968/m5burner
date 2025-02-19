@@ -501,6 +501,9 @@ async function setupLegacyElectron(version) {
         console.log('Running Electron Builder...');
         runCommand(ELECTRON_BUILD_CMD);
 
+        // Save appVersion.info before cleaning temp directory
+        const savedAppVersionInfo = fs.readFileSync(tempAppVersionPath, 'utf8');
+
         // Clean up temp directory
         cleanUp(TEMP_BUILD_DIR);
 
@@ -569,6 +572,13 @@ async function setupLegacyElectron(version) {
                 // For non-Windows platforms, copy everything as before
                 fs.cpSync(BUILD_DIR, depsTargetDir, { recursive: true });
             }
+
+            // Write the saved appVersion.info to the final location
+            console.log('Writing appVersion.info to packages directory...');
+            fs.writeFileSync(
+                path.join(depsTargetDir, 'appVersion.info'),
+                savedAppVersionInfo
+            );
         }
 
         // Step 7: Handle Python utilities
