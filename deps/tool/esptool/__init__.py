@@ -75,6 +75,7 @@ from esptool.loader import (
     ESPLoader,
     list_ports,
 )
+from esptool.logger import log
 from esptool.targets import CHIP_DEFS, CHIP_LIST, ESP32ROM
 from esptool.util import (
     FatalError,
@@ -151,7 +152,13 @@ def main(argv=None, esp=None):
         "--after",
         "-a",
         help="What to do after esptool.py is finished",
-        choices=["hard_reset", "soft_reset", "no_reset", "no_reset_stub"],
+        choices=[
+            "hard_reset",
+            "soft_reset",
+            "no_reset",
+            "no_reset_stub",
+            "watchdog_reset",
+        ],
         default=os.environ.get("ESPTOOL_AFTER", "hard_reset"),
     )
 
@@ -341,12 +348,6 @@ def main(argv=None, esp=None):
         "--no-progress", "-p", help="Suppress progress output", action="store_true"
     )
     parser_write_flash.add_argument(
-        "--verify",
-        help="Verify just-written data on flash "
-        "(mostly superfluous, data is read back during flashing)",
-        action="store_true",
-    )
-    parser_write_flash.add_argument(
         "--encrypt",
         help="Apply flash encryption when writing data "
         "(required correct efuse settings)",
@@ -395,13 +396,6 @@ def main(argv=None, esp=None):
     )
     parser_image_info.add_argument(
         "filename", help="Image file to parse", action=AutoHex2BinAction
-    )
-    parser_image_info.add_argument(
-        "--version",
-        "-v",
-        help="Output format version (1 - legacy, 2 - extended)",
-        choices=["1", "2"],
-        default="1",
     )
 
     parser_make_image = subparsers.add_parser(
@@ -719,7 +713,7 @@ def main(argv=None, esp=None):
     argv = expand_file_arguments(argv or sys.argv[1:])
 
     args = parser.parse_args(argv)
-    print("esptool.py v%s" % __version__)
+    log.print(f"esptool.py v{__version__}")
     load_config_file(verbose=True)
 
     StubFlasher.set_preferred_stub_subdir(args.stub_version)
@@ -782,7 +776,7 @@ def main(argv=None, esp=None):
             ser_list = get_port_list(
                 args.filterVids, args.filterPids, args.filterNames, args.filterSerials
             )
-            print("Found %d serial ports" % len(ser_list))
+            log.print(f"Found {len(ser_list)} serial ports")
         else:
             ser_list = [args.port]
         open_port_attempts = os.environ.get(
@@ -794,8 +788,9 @@ def main(argv=None, esp=None):
             raise SystemExit("Invalid value for ESPTOOL_OPEN_PORT_ATTEMPTS")
         if open_port_attempts != 1:
             if args.port is None or args.chip == "auto":
-                print(
-                    "WARNING: The ESPTOOL_OPEN_PORT_ATTEMPTS (open_port_attempts) option can only be used with --port and --chip arguments."
+                log.warning(
+                    "The ESPTOOL_OPEN_PORT_ATTEMPTS (open_port_attempts) option "
+                    "can only be used with --port and --chip arguments."
                 )
             else:
                 esp = esp or connect_loop(
@@ -819,27 +814,36 @@ def main(argv=None, esp=None):
         if esp is None:
             raise FatalError(
                 "Could not connect to an Espressif device "
-                "on any of the %d available serial ports." % len(ser_list)
+                f"on any of the {len(ser_list)} available serial ports."
             )
 
         if esp.secure_download_mode:
-            print("Chip is %s in Secure Download Mode" % esp.CHIP_NAME)
+            log.print(f"Chip is {esp.CHIP_NAME} in Secure Download Mode")
         else:
-            print("Chip is %s" % (esp.get_chip_description()))
-            print("Features: %s" % ", ".join(esp.get_chip_features()))
-            print("Crystal is %dMHz" % esp.get_crystal_freq())
+            log.print(f"Chip is {esp.get_chip_description()}")
+            log.print(f"Features: {', '.join(esp.get_chip_features())}")
+            log.print(f"Crystal is {esp.get_crystal_freq()}MHz")
+            usb_mode = esp.get_usb_mode()
+            if usb_mode is not None:
+                log.print(f"USB mode: {usb_mode}")
             read_mac(esp, args)
 
         if not args.no_stub:
             if esp.secure_download_mode:
-                print(
-                    "WARNING: Stub loader is not supported in Secure Download Mode, "
+                log.warning(
+                    "Stub loader is not supported in Secure Download Mode, "
                     "setting --no-stub"
                 )
                 args.no_stub = True
             elif not esp.IS_STUB and esp.stub_is_disabled:
-                print(
-                    "WARNING: Stub loader has been disabled for compatibility, "
+                log.warning(
+                    "Stub loader has been disabled for compatibility, "
+                    "setting --no-stub"
+                )
+                args.no_stub = True
+            elif esp.CHIP_NAME == "ESP32-H21":  # TODO: [ESP32H21] IDF-11509
+                log.warning(
+                    f"Stub loader is not yet supported on {esp.CHIP_NAME}, "
                     "setting --no-stub"
                 )
                 args.no_stub = True
@@ -849,8 +853,9 @@ def main(argv=None, esp=None):
                 except Exception:
                     # The CH9102 bridge (PID: 0x55D4) can have issues on MacOS
                     if sys.platform == "darwin" and esp._get_pid() == 0x55D4:
-                        print(
-                            "\nNote: If issues persist, "
+                        log.print()
+                        log.note(
+                            "If issues persist, "
                             "try installing the WCH USB-to-Serial MacOS driver."
                         )
                     raise
@@ -862,9 +867,9 @@ def main(argv=None, esp=None):
             try:
                 esp.change_baud(args.baud)
             except NotImplementedInROMError:
-                print(
-                    "WARNING: ROM doesn't support changing baud rate. "
-                    "Keeping initial baud rate %d" % initial_baud
+                log.warning(
+                    f"ROM doesn't support changing baud rate. "
+                    f"Keeping initial baud rate {initial_baud}"
                 )
 
         def _define_spi_conn(spi_connection):
@@ -886,11 +891,11 @@ def main(argv=None, esp=None):
                 # Encode the pin numbers as a 32-bit integer with packed 6-bit values,
                 # the same way the ESP ROM takes them
                 spi_config, value = _define_spi_conn(args.spi_connection)
-            print(f"Configuring SPI flash mode ({spi_config})...")
+            log.print(f"Configuring SPI flash mode ({spi_config})...")
             esp.flash_spi_attach(value)
         elif args.no_stub:
             if esp.CHIP_NAME != "ESP32" or esp.secure_download_mode:
-                print("Enabling default SPI flash mode...")
+                log.print("Enabling default SPI flash mode...")
                 # ROM loader doesn't enable flash unless we explicitly do it
                 esp.flash_spi_attach(0)
             else:
@@ -898,12 +903,12 @@ def main(argv=None, esp=None):
                 spi_chip_pads = esp.get_chip_spi_pads()
                 spi_config_txt, value = _define_spi_conn(spi_chip_pads)
                 if spi_chip_pads != (0, 0, 0, 0, 0):
-                    print(
-                        "Attaching flash from eFuses' SPI pads configuration"
+                    log.print(
+                        "Attaching flash from eFuses' SPI pads configuration "
                         f"({spi_config_txt})..."
                     )
                 else:
-                    print("Enabling default SPI flash mode...")
+                    log.print("Enabling default SPI flash mode...")
                 esp.flash_spi_attach(value)
 
         # XMC chip startup sequence
@@ -943,9 +948,9 @@ def main(argv=None, esp=None):
             if mf_id != XMC_VENDOR_ID:  # Non-XMC chip detected by SFDP Read, skipping.
                 return
 
-            print(
-                "WARNING: XMC flash chip boot-up failure detected! "
-                "Running XMC25QHxxC startup flow"
+            log.warning(
+                "XMC flash chip boot-up failure detected! "
+                "Running XMC25QHxxC startup flow."
             )
             esp.run_spiflash_command(0xB9)  # Enter DPD
             esp.run_spiflash_command(0x79)  # Enter UDPD
@@ -955,16 +960,16 @@ def main(argv=None, esp=None):
             time.sleep(0.00002)
             # Check for success
             if not is_xmc_chip_strict():
-                print("WARNING: XMC flash boot-up fix failed.")
-            print("XMC flash chip boot-up fix successful!")
+                log.warning("XMC flash boot-up fix failed.")
+            log.print("XMC flash chip boot-up fix successful!")
 
         # Check flash chip connection
         if not esp.secure_download_mode:
             try:
                 flash_id = esp.flash_id()
                 if flash_id in (0xFFFFFF, 0x000000):
-                    print(
-                        "WARNING: Failed to communicate with the flash chip, "
+                    log.warning(
+                        "Failed to communicate with the flash chip, "
                         "read/write operations will fail. "
                         "Try checking the chip connections or removing "
                         "any other hardware connected to IOs."
@@ -973,7 +978,7 @@ def main(argv=None, esp=None):
                         hasattr(args, "spi_connection")
                         and args.spi_connection is not None
                     ):
-                        print(
+                        log.print(
                             "Some GPIO pins might be used by other peripherals, "
                             "try using another --spi-connection combination."
                         )
@@ -989,14 +994,14 @@ def main(argv=None, esp=None):
                 esp.trace(f"Unable to perform XMC flash chip startup sequence ({e}).")
 
         if hasattr(args, "flash_size"):
-            print("Configuring flash size...")
+            log.print("Configuring flash size...")
             if args.flash_size == "detect":
                 flash_size = detect_flash_size(esp, args)
             elif args.flash_size == "keep":
                 flash_size = detect_flash_size(esp, args=None)
                 if not esp.IS_STUB:
-                    print(
-                        "WARNING: In case of failure, please set a specific --flash_size."
+                    log.warning(
+                        "In case of failure, please set a specific --flash_size."
                     )
             else:
                 flash_size = args.flash_size
@@ -1009,8 +1014,8 @@ def main(argv=None, esp=None):
                     and esp.CHIP_NAME != "ESP32-S3"
                     and flash_size_bytes(flash_size) > 16 * 1024 * 1024
                 ):
-                    print(
-                        "WARNING: Flasher stub doesn't fully support flash size larger "
+                    log.note(
+                        "Flasher stub doesn't fully support flash size larger "
                         "than 16MB, in case of failure use --no-stub."
                     )
 
@@ -1028,13 +1033,13 @@ def main(argv=None, esp=None):
                 raise FatalError(
                     "Detecting flash size failed. Set an exact size value."
                 )
-            print(f"Detected flash size: {size_str}")
+            log.print(f"Detected flash size: {size_str}")
             args.size = flash_size_bytes(size_str)
 
         if esp.IS_STUB and hasattr(args, "address") and hasattr(args, "size"):
             if esp.CHIP_NAME != "ESP32-S3" and args.address + args.size > 0x1000000:
-                print(
-                    "WARNING: Flasher stub doesn't fully support flash size larger "
+                log.note(
+                    "Flasher stub doesn't fully support flash size larger "
                     "than 16MB, in case of failure use --no-stub."
                 )
 
@@ -1050,17 +1055,26 @@ def main(argv=None, esp=None):
         # Handle post-operation behaviour (reset or other)
         if operation_func == load_ram:
             # the ESP is now running the loaded image, so let it run
-            print("Exiting immediately.")
+            log.print("Exiting immediately.")
         elif args.after == "hard_reset":
             esp.hard_reset()
         elif args.after == "soft_reset":
-            print("Soft resetting...")
+            log.print("Soft resetting...")
             # flash_finish will trigger a soft reset
             esp.soft_reset(False)
         elif args.after == "no_reset_stub":
-            print("Staying in flasher stub.")
+            log.print("Staying in flasher stub.")
+        elif args.after == "watchdog_reset":
+            if esp.secure_download_mode:
+                log.warning(
+                    "Watchdog hard reset is not supported in Secure Download Mode, "
+                    "attempting classic hard reset instead."
+                )
+                esp.hard_reset()
+            else:
+                esp.watchdog_reset()
         else:  # args.after == 'no_reset'
-            print("Staying in bootloader.")
+            log.print("Staying in bootloader.")
             if esp.IS_STUB:
                 esp.soft_reset(True)  # exit stub back to ROM loader
 
@@ -1135,7 +1149,7 @@ def expand_file_arguments(argv):
         else:
             new_args.append(arg)
     if expanded:
-        print(f"esptool.py {' '.join(new_args)}")
+        log.print(f"esptool.py {' '.join(new_args)}")
         return new_args
     return argv
 
@@ -1150,7 +1164,7 @@ def connect_loop(
 ):
     chip_class = CHIP_DEFS[chip]
     esp = None
-    print(f"Serial port {port}")
+    log.print(f"Serial port {port}")
 
     first = True
     ten_cycle = cycle(chain(repeat(False, 9), (True,)))
@@ -1163,7 +1177,7 @@ def connect_loop(
             esp = chip_class(port, initial_baud, trace)
             if not first:
                 # break the retrying line
-                print("")
+                log.print("")
             esp.connect(before)
             return esp
         except (
@@ -1176,14 +1190,14 @@ def connect_loop(
                 esp._port.close()
             esp = None
             if first:
-                print(err)
-                print("Retrying failed connection", end="", flush=True)
+                log.print(err)
+                log.print("Retrying failed connection", end="", flush=True)
                 first = False
             if last:
                 raise err
             if every_tenth:
                 # print a dot every second
-                print(".", end="", flush=True)
+                log.print(".", end="", flush=True)
             time.sleep(0.1)
 
 
@@ -1198,7 +1212,7 @@ def get_default_connected_device(
 ):
     _esp = None
     for each_port in reversed(serial_list):
-        print("Serial port %s" % each_port)
+        log.print(f"Serial port {each_port}")
         try:
             if chip == "auto":
                 _esp = detect_chip(
@@ -1212,7 +1226,7 @@ def get_default_connected_device(
         except (FatalError, OSError) as err:
             if port is not None:
                 raise
-            print("%s failed to connect: %s" % (each_port, err))
+            log.error(f"{each_port} failed to connect: {err}")
             if _esp and _esp._port:
                 _esp._port.close()
             _esp = None
@@ -1324,23 +1338,26 @@ def _main():
     try:
         main()
     except FatalError as e:
-        print(f"\nA fatal error occurred: {e}")
+        log.error(f"\nA fatal error occurred: {e}")
         sys.exit(2)
     except serial.serialutil.SerialException as e:
-        print(f"\nA serial exception error occurred: {e}")
-        print(
+        log.error(f"\nA serial exception error occurred: {e}")
+        log.error(
             "Note: This error originates from pySerial. "
             "It is likely not a problem with esptool, "
             "but with the hardware connection or drivers."
         )
-        print(
+        log.error(
             "For troubleshooting steps visit: "
             "https://docs.espressif.com/projects/esptool/en/latest/troubleshooting.html"
         )
         sys.exit(1)
     except StopIteration:
-        print(traceback.format_exc())
-        print("A fatal error occurred: The chip stopped responding.")
+        log.error(traceback.format_exc())
+        log.error("A fatal error occurred: The chip stopped responding.")
+        sys.exit(2)
+    except KeyboardInterrupt:
+        log.error("KeyboardInterrupt: Run cancelled by user.")
         sys.exit(2)
 
 

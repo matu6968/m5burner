@@ -10,8 +10,6 @@
     "@electron/remote": "^2.1.2",
     "@serialport/bindings-cpp": "^13.0.1",
     "axios": "^1.7.9",
-    "glob": "^11.0.1",
-    "lzma-native": "^8.0.6",
     "serialport": "^13.0.0",
     "unzipper": "^0.12.3",
     "usb": "^2.14.0"
@@ -29,7 +27,8 @@
     "rebuild": "electron-rebuild -f -w usb,serialport,@serialport/bindings-cpp",
     "package": "node package.js",
     "test": "electron app.js",
-    "create-update": "node scripts/create-update-package.js"
+    "create-update": "node scripts/create-update-package.js",
+    "update-esptool": "node esptool-update.js"
   },
   "build": {
     "appId": "com.m5stack.m5burner",

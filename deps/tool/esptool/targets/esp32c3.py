@@ -1,13 +1,15 @@
-# SPDX-FileCopyrightText: 2014-2024 Fredrik Ahlberg, Angus Gratton,
+# SPDX-FileCopyrightText: 2014-2025 Fredrik Ahlberg, Angus Gratton,
 # Espressif Systems (Shanghai) CO LTD, other contributors as noted.
 #
 # SPDX-License-Identifier: GPL-2.0-or-later
 
 import struct
+from time import sleep
 from typing import Dict
 
 from .esp32 import ESP32ROM
-from ..loader import ESPLoader
+from ..loader import ESPLoader, StubMixin
+from ..logger import log
 from ..util import FatalError, NotImplementedInROMError
 
 
@@ -252,48 +254,30 @@ class ESP32C3ROM(ESP32ROM):
         if not self.sync_stub_detected:  # Don't run if stub is reused
             self.disable_watchdogs()
 
-    def hard_reset(self):
-        if self.uses_usb_jtag_serial():
-            self.rtc_wdt_reset()
-        else:
-            ESPLoader.hard_reset(self)
-
-    def rtc_wdt_reset(self):
-        print("Hard resetting with RTC WDT...")
+    def watchdog_reset(self):
+        log.print("Hard resetting with a watchdog...")
         self.write_reg(self.RTC_CNTL_WDTWPROTECT_REG, self.RTC_CNTL_WDT_WKEY)  # unlock
-        self.write_reg(self.RTC_CNTL_WDTCONFIG1_REG, 5000)  # set WDT timeout
+        self.write_reg(self.RTC_CNTL_WDTCONFIG1_REG, 2000)  # set WDT timeout
         self.write_reg(
             self.RTC_CNTL_WDTCONFIG0_REG, (1 << 31) | (5 << 28) | (1 << 8) | 2
         )  # enable WDT
         self.write_reg(self.RTC_CNTL_WDTWPROTECT_REG, 0)  # lock
+        sleep(0.5)  # wait for reset to take effect
 
     def check_spi_connection(self, spi_connection):
         if not set(spi_connection).issubset(set(range(0, 22))):
             raise FatalError("SPI Pin numbers must be in the range 0-21.")
         if any([v for v in spi_connection if v in [18, 19]]):
-            print(
-                "WARNING: GPIO pins 18 and 19 are used by USB-Serial/JTAG, "
+            log.warning(
+                "GPIO pins 18 and 19 are used by USB-Serial/JTAG, "
                 "consider using other pins for SPI flash connection."
             )
 
 
-class ESP32C3StubLoader(ESP32C3ROM):
-    """Access class for ESP32C3 stub loader, runs on top of ROM.
+class ESP32C3StubLoader(StubMixin, ESP32C3ROM):
+    """Stub loader for ESP32-C3, runs on top of ROM."""
 
-    (Basically the same as ESP32StubLoader, but different base class.
-    Can possibly be made into a mixin.)
-    """
-
-    FLASH_WRITE_SIZE = 0x4000  # matches MAX_WRITE_BLOCK in stub_loader.c
-    STATUS_BYTES_LENGTH = 2  # same as ESP8266, different to ESP32 ROM
-    IS_STUB = True
-
-    def __init__(self, rom_loader):
-        self.secure_download_mode = rom_loader.secure_download_mode
-        self._port = rom_loader._port
-        self._trace_enabled = rom_loader._trace_enabled
-        self.cache = rom_loader.cache
-        self.flush_input()  # resets _slip_reader
+    pass
 
 
 ESP32C3ROM.STUB_CLASS = ESP32C3StubLoader

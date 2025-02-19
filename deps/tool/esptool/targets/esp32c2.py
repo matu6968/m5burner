@@ -1,4 +1,4 @@
-# SPDX-FileCopyrightText: 2014-2024 Fredrik Ahlberg, Angus Gratton,
+# SPDX-FileCopyrightText: 2014-2025 Fredrik Ahlberg, Angus Gratton,
 # Espressif Systems (Shanghai) CO LTD, other contributors as noted.
 #
 # SPDX-License-Identifier: GPL-2.0-or-later
@@ -8,7 +8,8 @@ import time
 from typing import Dict
 
 from .esp32c3 import ESP32C3ROM
-from ..loader import ESPLoader
+from ..loader import ESPLoader, StubMixin
+from ..logger import log
 from ..util import FatalError
 
 
@@ -116,11 +117,11 @@ class ESP32C2ROM(ESP32C3ROM):
             # a 26 MHz XTAL.
             false_rom_baud = baud * 40 // 26
 
-            print(f"Changing baud rate to {baud}")
+            log.print(f"Changing baud rate to {baud}")
             self.command(
                 self.ESP_CHANGE_BAUDRATE, struct.pack("<II", false_rom_baud, 0)
             )
-            print("Changed.")
+            log.print("Changed.")
             self._set_port_baudrate(baud)
             time.sleep(0.05)  # get rid of garbage sent during baud rate change
             self.flush_input()
@@ -132,9 +133,6 @@ class ESP32C2ROM(ESP32C3ROM):
         if not self.secure_download_mode and self.get_chip_revision() == 0:
             self.stub_is_disabled = True
             self.IS_STUB = False
-
-    def hard_reset(self):
-        ESPLoader.hard_reset(self)
 
     """ Try to read (encryption key) and check if it is valid """
 
@@ -169,23 +167,10 @@ class ESP32C2ROM(ESP32C3ROM):
             raise FatalError("SPI Pin numbers must be in the range 0-20.")
 
 
-class ESP32C2StubLoader(ESP32C2ROM):
-    """Access class for ESP32C2 stub loader, runs on top of ROM.
+class ESP32C2StubLoader(StubMixin, ESP32C2ROM):
+    """Stub loader for ESP32-C2, runs on top of ROM."""
 
-    (Basically the same as ESP32StubLoader, but different base class.
-    Can possibly be made into a mixin.)
-    """
-
-    FLASH_WRITE_SIZE = 0x4000  # matches MAX_WRITE_BLOCK in stub_loader.c
-    STATUS_BYTES_LENGTH = 2  # same as ESP8266, different to ESP32 ROM
-    IS_STUB = True
-
-    def __init__(self, rom_loader):
-        self.secure_download_mode = rom_loader.secure_download_mode
-        self._port = rom_loader._port
-        self._trace_enabled = rom_loader._trace_enabled
-        self.cache = rom_loader.cache
-        self.flush_input()  # resets _slip_reader
+    pass
 
 
 ESP32C2ROM.STUB_CLASS = ESP32C2StubLoader

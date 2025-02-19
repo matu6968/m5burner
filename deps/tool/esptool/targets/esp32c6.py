@@ -1,4 +1,4 @@
-# SPDX-FileCopyrightText: 2024 Fredrik Ahlberg, Angus Gratton,
+# SPDX-FileCopyrightText: 2024-2025 Fredrik Ahlberg, Angus Gratton,
 # Espressif Systems (Shanghai) CO LTD, other contributors as noted.
 #
 # SPDX-License-Identifier: GPL-2.0-or-later
@@ -6,7 +6,8 @@
 import struct
 
 from .esp32c3 import ESP32C3ROM
-from ..loader import ESPLoader
+from ..loader import ESPLoader, StubMixin
+from ..logger import log
 from ..util import FatalError, NotImplementedInROMError
 
 
@@ -187,34 +188,21 @@ class ESP32C6ROM(ESP32C3ROM):
         if not set(spi_connection).issubset(set(range(0, 31))):
             raise FatalError("SPI Pin numbers must be in the range 0-30.")
         if any([v for v in spi_connection if v in [12, 13]]):
-            print(
-                "WARNING: GPIO pins 12 and 13 are used by USB-Serial/JTAG, "
+            log.warning(
+                "GPIO pins 12 and 13 are used by USB-Serial/JTAG, "
                 "consider using other pins for SPI flash connection."
             )
 
-    def hard_reset(self):
+    def watchdog_reset(self):
         # Bug in the USB-Serial/JTAG controller can cause the port to disappear
-        # if the chip is reset with RTC WDT, do a classic reset
-        ESPLoader.hard_reset(self)
+        # if watchdog reset happens, disable it on ESP32-C6
+        ESPLoader.watchdog_reset(self)
 
 
-class ESP32C6StubLoader(ESP32C6ROM):
-    """Access class for ESP32C6 stub loader, runs on top of ROM.
+class ESP32C6StubLoader(StubMixin, ESP32C6ROM):
+    """Stub loader for ESP32-C6, runs on top of ROM."""
 
-    (Basically the same as ESP32StubLoader, but different base class.
-    Can possibly be made into a mixin.)
-    """
-
-    FLASH_WRITE_SIZE = 0x4000  # matches MAX_WRITE_BLOCK in stub_loader.c
-    STATUS_BYTES_LENGTH = 2  # same as ESP8266, different to ESP32 ROM
-    IS_STUB = True
-
-    def __init__(self, rom_loader):
-        self.secure_download_mode = rom_loader.secure_download_mode
-        self._port = rom_loader._port
-        self._trace_enabled = rom_loader._trace_enabled
-        self.cache = rom_loader.cache
-        self.flush_input()  # resets _slip_reader
+    pass
 
 
 ESP32C6ROM.STUB_CLASS = ESP32C6StubLoader

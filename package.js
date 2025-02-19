@@ -82,6 +82,11 @@ const TEMP_BUILD_DIR = path.resolve('.temp-build');
 const LINUX_LAUNCHER_SOURCE = path.resolve('assets/linux-launcher/m5burner-launcher-linux.c');
 const LINUX_LAUNCHER_OUTPUT = path.resolve('assets/linux-launcher/m5burner-launcher');
 
+// Add these constants near the top
+const MINIMUM_ELECTRON_VERSION = 22; // Minimum supported version
+const MINIMUM_WINDOWS_PYTHON_VERSION = '3.9.0'; // Python version that dropped Win7 support
+const DEFAULT_ELECTRON_VERSION = require('./package.json').devDependencies.electron.replace('^', '');
+
 // Helper function to run shell commands
 function runCommand(command) {
     console.log(`Running command: ${command}`);
@@ -134,9 +139,52 @@ function setupMacOSStructure() {
     }
 }
 
-// Helper function to compile Python utilities with PyInstaller
-function compilePythonUtilities() {
+// Add this helper function to check Python version
+function getPythonVersion() {
+    try {
+        const result = spawnSync('python', ['--version']);
+        if (result.status === 0) {
+            const version = result.stdout.toString().trim().split(' ')[1];
+            return version;
+        }
+    } catch (error) {
+        console.warn('Failed to get Python version');
+    }
+    return null;
+}
+
+// Modify the compilePythonUtilities function
+function compilePythonUtilities(isLegacyBuild = false, electronVersion = null) {
     if (process.platform !== 'win32') return;
+
+    // Check Python version only for Electron 22 legacy builds
+    if (isLegacyBuild && electronVersion === '22') {
+        const pythonVersion = getPythonVersion();
+        if (pythonVersion) {
+            if (pythonVersion >= MINIMUM_WINDOWS_PYTHON_VERSION) {
+                console.warn('\n⚠️  WARNING: Windows 7 Compatibility Issue ⚠️');
+                console.warn('You are building with Python ' + pythonVersion);
+                console.warn('Official Python versions 3.9 and above do not support Windows 7.');
+                console.warn('\nTo maintain Windows 7 compatibility, you need to:');
+                console.warn('1. Install Python 3.8 (last version with Windows 7 support)');
+                console.warn('2. Manually compile and replace the Python utilities using:');
+                console.warn('\n   Python utilities to compile separately:');
+                PYTHON_UTILITIES.forEach(util => {
+                    console.warn(`   - ${util.script} → ${util.output}`);
+                });
+                console.warn('\n   Commands to run with Python 3.8:');
+                console.warn('   pip install pyinstaller cryptography');
+                PYTHON_UTILITIES.forEach(util => {
+                    let cmd = `   pyinstaller --onefile "${util.script}" --distpath "packages/tool/dist" --name "${util.output}"`;
+                    if (util.output === 'esptool') {
+                        cmd += ' --icon "assets/esptool.ico"';
+                    }
+                    console.warn(cmd);
+                });
+                console.warn('\nContinuing build with current Python version...\n');
+            }
+        }
+    }
 
     console.log('Compiling Python utilities with PyInstaller...');
     
@@ -259,6 +307,28 @@ function generateTimestampVersion() {
     return `${year}${month}${day}${hour}${minute}`;
 }
 
+// Add this helper function after other helper functions
+function generateSyncedTimestampVersion() {
+    const now = new Date();
+    // Round down to nearest 10 minute interval
+    const minutes = Math.floor(now.getMinutes() / 10) * 10;
+    
+    // Create a new date with rounded minutes
+    const syncedDate = new Date(now);
+    syncedDate.setMinutes(minutes);
+    syncedDate.setSeconds(0);
+    syncedDate.setMilliseconds(0);
+    
+    // Format the date
+    const year = syncedDate.getFullYear();
+    const month = String(syncedDate.getMonth() + 1).padStart(2, '0');
+    const day = String(syncedDate.getDate()).padStart(2, '0');
+    const hour = String(syncedDate.getHours()).padStart(2, '0');
+    const syncedMinutes = String(minutes).padStart(2, '0');
+    
+    return `${year}${month}${day}${hour}${syncedMinutes}`;
+}
+
 // Create zip archive or move DMG for macOS
 function createZipArchive(sourceDir, version, gitHash) {
     const platform = process.platform === 'win32' ? 'win' : 
@@ -328,174 +398,258 @@ function compileLauncherForLinux() {
     }
 }
 
-// Main script
-(function main() {
-    console.log('Starting the build and packaging process...');
-
-    // Add this line early in the process
-    compileLauncherForLinux();
-
-    // Create temp build directory
-    cleanUp(TEMP_BUILD_DIR);
-    createFolder(TEMP_BUILD_DIR);
-    createFolder(path.join(TEMP_BUILD_DIR, 'packages'));
-    createFolder(path.join(TEMP_BUILD_DIR, 'packages', 'tool'));
-
-    // Generate and write appVersion.info to temp directory
-    const timestampVersion = generateTimestampVersion();
-    const tempAppVersionPath = path.join(TEMP_BUILD_DIR, 'packages', 'appVersion.info');
-    console.log('Creating temporary appVersion.info...');
-    fs.writeFileSync(tempAppVersionPath, timestampVersion);
-
-    // Compile and copy NVS tool to temp directory for macOS
-    if (process.platform === 'darwin') {
-        console.log('Compiling ESP NVS tool with PyInstaller...');
-        runCommand(PYINSTALLER_CMD);
-        if (fs.existsSync(PYINSTALLER_BINARY)) {
-            const tempNvsPath = path.join(TEMP_BUILD_DIR, 'packages', 'tool', 'nvs');
-            fs.copyFileSync(PYINSTALLER_BINARY, tempNvsPath);
-        }
-    }
-
-    // Step 1: Run electron-builder
-    console.log('Running Electron Builder...');
-    runCommand(ELECTRON_BUILD_CMD);
-
-    // Clean up temp directory
-    cleanUp(TEMP_BUILD_DIR);
-
-    // Step 2: Compile Python utilities on Windows
-    if (process.platform === 'win32') {
-        cleanPythonBuildArtifacts(); // Clean up any previous builds
-        compilePythonUtilities();
-    } else {
-        // Original PyInstaller command for non-Windows platforms
-        console.log('Compiling ESP NVS tool with PyInstaller...');
-        runCommand(PYINSTALLER_CMD);
-    }
-
-    // Step 3: Clean up existing architecture folder
-    cleanUp(OUTPUT_DIR);
-
-    // Step 4: Create required folder structure
-    if (process.platform === 'darwin') {
-        setupMacOSStructure();
-    } else {
-        createFolder(OUTPUT_DIR);
-        createFolder(BIN_DIR);
-        createFolder(PACKAGES_DIR);
-        createFolder(TOOL_DIR);
-    }
-
-    // Step 5: Copy Electron Builder output
-    console.log(`Copying Electron Builder output from ${ELECTRON_OUTPUT}...`);
-    if (!fs.existsSync(ELECTRON_OUTPUT)) {
-        console.error(`Electron output folder not found: ${ELECTRON_OUTPUT}`);
+// Add this helper function after other helper functions
+async function setupLegacyElectron(version) {
+    const requestedVersion = parseInt(version);
+    
+    if (isNaN(requestedVersion) || requestedVersion < MINIMUM_ELECTRON_VERSION) {
+        console.error(`Invalid or unsupported Electron version: ${version}`);
+        console.error(`Minimum supported version is ${MINIMUM_ELECTRON_VERSION}.x`);
         process.exit(1);
     }
 
-    if (process.platform === 'darwin') {
-        // For macOS, copy the entire .app bundle structure
-        fs.cpSync(ELECTRON_OUTPUT, OUTPUT_DIR, { recursive: true });
-    } else {
-        const targetDir = BIN_DIR;
-        fs.cpSync(ELECTRON_OUTPUT, targetDir, { recursive: true });
+    console.log(`Setting up legacy Electron v${version}...`);
+
+    // Read current package.json
+    const packageJsonPath = path.resolve('package.json');
+    const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, 'utf8'));
+    
+    // Store original version for restoration
+    const originalVersion = packageJson.devDependencies.electron;
+    
+    try {
+        // Update electron version in package.json
+        packageJson.devDependencies.electron = `^${version}.0.0`;
+        fs.writeFileSync(packageJsonPath, JSON.stringify(packageJson, null, 2));
+        
+        // Remove existing electron installation
+        const electronModulePath = path.resolve('node_modules/electron');
+        if (fs.existsSync(electronModulePath)) {
+            console.log('Removing existing Electron installation...');
+            fs.rmSync(electronModulePath, { recursive: true, force: true });
+        }
+        
+        // Install new electron version
+        console.log('Installing legacy Electron version...');
+        execSync('npm install electron@' + version, { stdio: 'inherit' });
+        
+        // Rebuild native modules
+        console.log('Rebuilding native modules for legacy Electron...');
+        execSync('npm run rebuild', { stdio: 'inherit' });
+        
+        return originalVersion; // Return original version for restoration
+    } catch (error) {
+        // Restore original version in case of failure
+        packageJson.devDependencies.electron = originalVersion;
+        fs.writeFileSync(packageJsonPath, JSON.stringify(packageJson, null, 2));
+        
+        console.error('Failed to setup legacy Electron:', error);
+        process.exit(1);
+    }
+}
+
+// Main script
+(async function main() {
+    console.log('Starting the build and packaging process...');
+
+    // Parse legacy release flag
+    const legacyFlag = process.argv.indexOf('--legacy-release');
+    let originalElectronVersion = null;
+    let isLegacyBuild = false;
+    let requestedVersion = null;
+    
+    if (legacyFlag !== -1 && legacyFlag + 1 < process.argv.length) {
+        requestedVersion = process.argv[legacyFlag + 1];
+        originalElectronVersion = await setupLegacyElectron(requestedVersion);
+        isLegacyBuild = true;
     }
 
-    // Step 6: Copy dependency directory files
-    const depsTargetDir = process.platform === 'darwin' ? 
-        path.join(MACOS_RESOURCES_DIR, 'packages') : PACKAGES_DIR;
-    
-    console.log(`Copying dependencies from ${BUILD_DIR} to ${depsTargetDir}...`);
-    if (fs.existsSync(BUILD_DIR)) {
-        // Create the target directory if it doesn't exist
-        createFolder(depsTargetDir);
+    try {
+        // Add this line early in the process
+        compileLauncherForLinux();
+
+        // Create temp build directory
+        cleanUp(TEMP_BUILD_DIR);
+        createFolder(TEMP_BUILD_DIR);
+        createFolder(path.join(TEMP_BUILD_DIR, 'packages'));
+        createFolder(path.join(TEMP_BUILD_DIR, 'packages', 'tool'));
+
+        // Check for --time-sync flag
+        const useTimeSync = process.argv.includes('--time-sync');
         
+        // Generate and write appVersion.info to temp directory
+        const timestampVersion = useTimeSync ? 
+            generateSyncedTimestampVersion() : 
+            generateTimestampVersion();
+        
+        const tempAppVersionPath = path.join(TEMP_BUILD_DIR, 'packages', 'appVersion.info');
+        console.log('Creating temporary appVersion.info...');
+        console.log(`Using ${useTimeSync ? 'synced' : 'exact'} timestamp: ${timestampVersion}`);
+        fs.writeFileSync(tempAppVersionPath, timestampVersion);
+
+        // Compile and copy NVS tool to temp directory for macOS
+        if (process.platform === 'darwin') {
+            console.log('Compiling ESP NVS tool with PyInstaller...');
+            runCommand(PYINSTALLER_CMD);
+            if (fs.existsSync(PYINSTALLER_BINARY)) {
+                const tempNvsPath = path.join(TEMP_BUILD_DIR, 'packages', 'tool', 'nvs');
+                fs.copyFileSync(PYINSTALLER_BINARY, tempNvsPath);
+            }
+        }
+
+        // Step 1: Run electron-builder
+        console.log('Running Electron Builder...');
+        runCommand(ELECTRON_BUILD_CMD);
+
+        // Clean up temp directory
+        cleanUp(TEMP_BUILD_DIR);
+
+        // Step 2: Compile Python utilities on Windows
         if (process.platform === 'win32') {
-            // On Windows, only copy directories that aren't Python-related
-            const dirsToExclude = ['esptool', 'intelhex', 'serial', '__pycache__', 'tool'];
-            
-            // Copy only non-excluded directories
-            fs.readdirSync(BUILD_DIR).forEach(item => {
-                const sourcePath = path.join(BUILD_DIR, item);
-                const targetPath = path.join(depsTargetDir, item);
-                
-                if (fs.statSync(sourcePath).isDirectory() && !dirsToExclude.includes(item)) {
-                    // Copy directories that are not in the exclude list
-                    fs.cpSync(sourcePath, targetPath, { recursive: true });
-                }
-            });
+            cleanPythonBuildArtifacts(); // Clean up any previous builds
+            compilePythonUtilities(isLegacyBuild, requestedVersion);
         } else {
-            // For non-Windows platforms, copy everything as before
-            fs.cpSync(BUILD_DIR, depsTargetDir, { recursive: true });
+            // Original PyInstaller command for non-Windows platforms
+            console.log('Compiling ESP NVS tool with PyInstaller...');
+            runCommand(PYINSTALLER_CMD);
         }
-    }
 
-    // Step 7: Handle Python utilities
-    const toolTargetDir = process.platform === 'darwin' ? 
-        path.join(MACOS_RESOURCES_DIR, 'packages', 'tool') : TOOL_DIR;
+        // Step 3: Clean up existing architecture folder
+        cleanUp(OUTPUT_DIR);
 
-    if (process.platform === 'win32') {
-        // Copy compiled Python utilities on Windows
-        copyCompiledUtilities(toolTargetDir);
-        // Clean up build artifacts
-        cleanPythonBuildArtifacts();
-    } else {
-        // Original NVS tool copy for non-Windows platforms
-        console.log(`Copying ESP NVS tool binary to ${toolTargetDir}...`);
-        if (fs.existsSync(PYINSTALLER_BINARY)) {
-            const renamedBinaryPath = path.join(toolTargetDir, 'nvs');
-            fs.copyFileSync(PYINSTALLER_BINARY, renamedBinaryPath);
-        }
-    }
-
-    // Step 9: Copy the M5Burner startup script from the build directory to the root of the architecture folder if running on Windows or Linux
-    if (process.platform === 'win32') {
-        console.log(`Copying M5Burner startup binary from build directory to root of ${OUTPUT_DIR}...`);
-        if (fs.existsSync(STARTUP_BINARY_WINDOWS)) {
-            const destinationPath = path.join(OUTPUT_DIR, path.basename(STARTUP_BINARY_WINDOWS));
-            fs.copyFileSync(STARTUP_BINARY_WINDOWS, destinationPath);
-            console.log(`Copied file to: ${destinationPath}`);
+        // Step 4: Create required folder structure
+        if (process.platform === 'darwin') {
+            setupMacOSStructure();
         } else {
-            console.warn(`File to copy not found: ${STARTUP_BINARY_WINDOWS}`);
+            createFolder(OUTPUT_DIR);
+            createFolder(BIN_DIR);
+            createFolder(PACKAGES_DIR);
+            createFolder(TOOL_DIR);
         }
-    } else if (process.platform === 'linux') {
-        console.log(`Copying M5Burner launcher from build directory to root of ${OUTPUT_DIR}...`);
-        if (fs.existsSync(LINUX_LAUNCHER_OUTPUT)) {
-            const destinationPath = path.join(OUTPUT_DIR, 'M5Burner');
-            fs.copyFileSync(LINUX_LAUNCHER_OUTPUT, destinationPath);
-            fs.chmodSync(destinationPath, '755');
-            console.log(`Copied launcher to: ${destinationPath}`);
-        } else {
-            console.warn(`Compiled launcher not found: ${LINUX_LAUNCHER_OUTPUT}`);
-        }
-    } else {
-        console.log('You are not running Linux or Windows, skipping startup script/binary copy');
-    }
-    
-    // Check if --new-release flag is present
-    if (process.argv.includes('--new-release')) {
-        console.log('Creating release archive...');
-        
-        // Read version from package.json
-        const packageJsonPath = path.resolve('package.json');
-        let version;
-        try {
-            const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, 'utf8'));
-            version = packageJson.version;
-        } catch (error) {
-            console.error('Failed to read package.json:', error);
+
+        // Step 5: Copy Electron Builder output
+        console.log(`Copying Electron Builder output from ${ELECTRON_OUTPUT}...`);
+        if (!fs.existsSync(ELECTRON_OUTPUT)) {
+            console.error(`Electron output folder not found: ${ELECTRON_OUTPUT}`);
             process.exit(1);
         }
+
+        if (process.platform === 'darwin') {
+            // For macOS, copy the entire .app bundle structure
+            fs.cpSync(ELECTRON_OUTPUT, OUTPUT_DIR, { recursive: true });
+        } else {
+            const targetDir = BIN_DIR;
+            fs.cpSync(ELECTRON_OUTPUT, targetDir, { recursive: true });
+        }
+
+        // Step 6: Copy dependency directory files
+        const depsTargetDir = process.platform === 'darwin' ? 
+            path.join(MACOS_RESOURCES_DIR, 'packages') : PACKAGES_DIR;
         
-        // Get git commit hash
-        const gitHash = getGitCommitHash();
+        console.log(`Copying dependencies from ${BUILD_DIR} to ${depsTargetDir}...`);
+        if (fs.existsSync(BUILD_DIR)) {
+            // Create the target directory if it doesn't exist
+            createFolder(depsTargetDir);
+            
+            if (process.platform === 'win32') {
+                // On Windows, only copy directories that aren't Python-related
+                const dirsToExclude = ['esptool', 'intelhex', 'serial', '__pycache__', 'tool'];
+                
+                // Copy only non-excluded directories
+                fs.readdirSync(BUILD_DIR).forEach(item => {
+                    const sourcePath = path.join(BUILD_DIR, item);
+                    const targetPath = path.join(depsTargetDir, item);
+                    
+                    if (fs.statSync(sourcePath).isDirectory() && !dirsToExclude.includes(item)) {
+                        // Copy directories that are not in the exclude list
+                        fs.cpSync(sourcePath, targetPath, { recursive: true });
+                    }
+                });
+            } else {
+                // For non-Windows platforms, copy everything as before
+                fs.cpSync(BUILD_DIR, depsTargetDir, { recursive: true });
+            }
+        }
+
+        // Step 7: Handle Python utilities
+        const toolTargetDir = process.platform === 'darwin' ? 
+            path.join(MACOS_RESOURCES_DIR, 'packages', 'tool') : TOOL_DIR;
+
+        if (process.platform === 'win32') {
+            // Copy compiled Python utilities on Windows
+            copyCompiledUtilities(toolTargetDir);
+            // Clean up build artifacts
+            cleanPythonBuildArtifacts();
+        } else {
+            // Original NVS tool copy for non-Windows platforms
+            console.log(`Copying ESP NVS tool binary to ${toolTargetDir}...`);
+            if (fs.existsSync(PYINSTALLER_BINARY)) {
+                const renamedBinaryPath = path.join(toolTargetDir, 'nvs');
+                fs.copyFileSync(PYINSTALLER_BINARY, renamedBinaryPath);
+            }
+        }
+
+        // Step 9: Copy the M5Burner startup script from the build directory to the root of the architecture folder if running on Windows or Linux
+        if (process.platform === 'win32') {
+            console.log(`Copying M5Burner startup binary from build directory to root of ${OUTPUT_DIR}...`);
+            if (fs.existsSync(STARTUP_BINARY_WINDOWS)) {
+                const destinationPath = path.join(OUTPUT_DIR, path.basename(STARTUP_BINARY_WINDOWS));
+                fs.copyFileSync(STARTUP_BINARY_WINDOWS, destinationPath);
+                console.log(`Copied file to: ${destinationPath}`);
+            } else {
+                console.warn(`File to copy not found: ${STARTUP_BINARY_WINDOWS}`);
+            }
+        } else if (process.platform === 'linux') {
+            console.log(`Copying M5Burner launcher from build directory to root of ${OUTPUT_DIR}...`);
+            if (fs.existsSync(LINUX_LAUNCHER_OUTPUT)) {
+                const destinationPath = path.join(OUTPUT_DIR, 'M5Burner');
+                fs.copyFileSync(LINUX_LAUNCHER_OUTPUT, destinationPath);
+                fs.chmodSync(destinationPath, '755');
+                console.log(`Copied launcher to: ${destinationPath}`);
+            } else {
+                console.warn(`Compiled launcher not found: ${LINUX_LAUNCHER_OUTPUT}`);
+            }
+        } else {
+            console.log('You are not running Linux or Windows, skipping startup script/binary copy');
+        }
         
-        // Create zip archive
-        createZipArchive(OUTPUT_DIR, version, gitHash);
+        // Check if --new-release flag is present
+        if (process.argv.includes('--new-release')) {
+            console.log('Creating release archive...');
+            
+            // Read version from package.json
+            const packageJsonPath = path.resolve('package.json');
+            let version;
+            try {
+                const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, 'utf8'));
+                version = packageJson.version;
+            } catch (error) {
+                console.error('Failed to read package.json:', error);
+                process.exit(1);
+            }
+            
+            // Get git commit hash
+            const gitHash = getGitCommitHash();
+            
+            // Create zip archive
+            createZipArchive(OUTPUT_DIR, version, gitHash);
+        }
+        
+        console.log('Build and packaging process completed successfully.');
+    } finally {
+        // Restore original Electron version if we modified it
+        if (originalElectronVersion) {
+            console.log('Restoring original Electron version...');
+            const packageJson = JSON.parse(fs.readFileSync(path.resolve('package.json'), 'utf8'));
+            packageJson.devDependencies.electron = originalElectronVersion;
+            fs.writeFileSync(path.resolve('package.json'), JSON.stringify(packageJson, null, 2));
+            
+            // Reinstall original version
+            console.log('Reinstalling original Electron version...');
+            execSync('npm install', { stdio: 'inherit' });
+            execSync('npm run rebuild', { stdio: 'inherit' });
+        }
     }
-    
-    console.log('Build and packaging process completed successfully.');
 })();
 
 

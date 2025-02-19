@@ -1,13 +1,78 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport"
-        content="width=device-width, user-scalable=no, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0">
-  <meta http-equiv="X-UA-Compatible" content="ie=edge">
-  <title>Error</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>M5Burner Installation Error</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            max-width: 800px;
+            margin: 40px auto;
+            padding: 20px;
+            background-color: #f5f5f7;
+            color: #1d1d1f;
+            line-height: 1.6;
+        }
+
+        .error-container {
+            background-color: white;
+            border-radius: 10px;
+            padding: 30px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+
+        h1 {
+            color: #ff3b30;
+            margin-bottom: 20px;
+            font-size: 24px;
+        }
+
+        .steps {
+            margin: 20px 0;
+            padding-left: 20px;
+        }
+
+        .steps li {
+            margin: 10px 0;
+        }
+
+        .note {
+            background-color: #f2f2f7;
+            padding: 15px;
+            border-radius: 6px;
+            margin-top: 20px;
+            border-left: 4px solid #007aff;
+        }
+
+        .icon {
+            font-size: 48px;
+            text-align: center;
+            margin-bottom: 20px;
+        }
+    </style>
 </head>
 <body>
-  <h1>Put M5Burner in /Applications</h1>
+    <div class="error-container">
+        <div class="icon">⚠️</div>
+        <h1>M5Burner needs to be in the Applications folder</h1>
+        
+        <p>
+            It looks like you're trying to run M5Burner from outside the Applications folder. 
+            For security and proper functionality, macOS requires M5Burner to run from the Applications folder.
+        </p>
+
+        <h2>How to fix this:</h2>
+        <ol class="steps">
+            <li>Close M5Burner completely</li>
+            <li>Drag the M5Burner app to your Applications folder</li>
+            <li>Open M5Burner from the Applications folder</li>
+        </ol>
+
+        <div class="note">
+            <strong>Why this happens:</strong> macOS has security features that require applications to run from specific locations. 
+            Running from the Applications folder ensures all features work correctly and helps maintain system security.
+        </div>
+    </div>
 </body>
 </html>

@@ -12,14 +12,17 @@ Changes in this version:
 1. Clone this repo (+ submodules) and install dependencies
 ```bash
 git clone --recurse-submodules https://github.com/matu6968/m5burner.git 
+# --recurse-submodules is needed to clone esp-idf-nvs-partition-gen submodule
+# if you forgot to do so, run git submodule update --init after cloning
 cd m5burner
 yarn install
-yarn install appdmg # only needed for making .dmg files and MacOS compatible only dependency
 pip install pyinstaller
+# To install libnotify dependencies for Linux launcher to build depending on distro
 sudo apt install libnotify-dev # on Ubuntu/Debian systems
 sudo pacman -S libnotify # on Arch Linux systems
 sudo dnf install libnotify # on Fedora systems
 sudo zypper install libnotify # on openSUSE systems
+# for other distros, refer to your distro's package manager for libnotify equivalent
 ```
 2. Recompile native dependencies
 ```bash
