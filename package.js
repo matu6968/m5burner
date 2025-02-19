@@ -364,10 +364,10 @@ function createZipArchive(sourceDir, version, gitHash) {
         
         const zipCommand = process.platform === 'win32' ?
             `powershell Compress-Archive -Path "${sourceDir}/*" -DestinationPath "${fileName}" -Force` :
-            `zip -r "${fileName}" "${sourceDir}"/*`;
+            `cd "${sourceDir}" && zip -r "../${fileName}" ./*`;
         
         try {
-            execSync(zipCommand);
+            execSync(zipCommand, { stdio: 'inherit' });
             console.log(`Successfully created ${fileName}`);
         } catch (error) {
             console.error('Failed to create zip archive:', error);
@@ -610,7 +610,7 @@ async function setupLegacyElectron(version) {
                 console.warn(`Compiled launcher not found: ${LINUX_LAUNCHER_OUTPUT}`);
             }
         } else {
-            console.log('You are not running Linux or Windows, skipping startup script/binary copy');
+            console.log('You are not running Linux or Windows, skipping startup binary copy');
         }
         
         // Check if --new-release flag is present
