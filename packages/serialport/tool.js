@@ -29,6 +29,11 @@ let pid = null
 
 const ALIAS_STICKV = 'stickv & unitv'
 
+const stripAnsiCodes = (str) => {
+  // Remove ANSI escape codes
+  return str.replace(/\x1B\[([0-9]{1,3}(;[0-9]{1,3})*)?[m|K]/g, '');
+}
+
 function getMac(port) {
   return new Promise(resolve => {
     let comPrefix = ''
@@ -115,14 +120,14 @@ function erase(opts, send) {
   let process = runBurnScript(os.platform(), opts.device, ['--port', comPrefix + opts.com, 'erase_flash'])
   pid = process.pid
   process.stdout.on('data', chunk => {
-    let msg = chunk.toString()
+    let msg = stripAnsiCodes(chunk.toString())
     send({
       status: 1,
       message: msg
     })
   })
   process.stderr.on('data', chunk => {
-    let msg = chunk.toString()
+    let msg = stripAnsiCodes(chunk.toString())
     send({
       status: 1,
       message: msg
@@ -179,14 +184,14 @@ function burn(opts, send) {
     message: args.join(' ')
   })
   process.stdout.on('data', chunk => {
-    let msg = chunk.toString()
+    let msg = stripAnsiCodes(chunk.toString())
     send({
       status: 1,
       message: msg
     })
   })
   process.stderr.on('data', chunk => {
-    let msg = chunk.toString()
+    let msg = stripAnsiCodes(chunk.toString())
     send({
       status: 1,
       message: msg
@@ -216,14 +221,14 @@ function shareBurn(opts, send) {
     message: args.join(' ')
   })
   process.stdout.on('data', chunk => {
-    let msg = chunk.toString()
+    let msg = stripAnsiCodes(chunk.toString())
     send({
       status: 1,
       message: msg
     })
   })
   process.stderr.on('data', chunk => {
-    let msg = chunk.toString()
+    let msg = stripAnsiCodes(chunk.toString())
     send({
       status: 1,
       message: msg
