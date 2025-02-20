@@ -22,6 +22,32 @@ module.exports = {
     ],
     files: [
       "**/*",
+      // Exclude build output folders
+      "!m5burner-*/**/*",
+      "!m5stack-*/**/*",
+      "!dist/**/*",
+      "!build/**/*",
+      // Exclude development files
+      "!**/.git/**/*",
+      "!**/.vscode/**/*",
+      "!**/node_modules/.cache/**/*",
+      "!**/*.map",
+      "!**/*.ts",
+      // Exclude test and documentation
+      "!**/test/**/*",
+      "!**/tests/**/*",
+      "!**/docs/**/*",
+      "!**/doc/**/*",
+      "!**/*.md",
+      // Exclude source maps and TypeScript files
+      "!**/*.js.map",
+      "!**/*.ts",
+      "!**/*.tsx",
+      // Exclude package management and installer files
+      "!package-lock.json",
+      "!yarn.lock",
+      "!**/*.dmg",
+      // Standard exclusions from before
       "!**/node_modules/*/{CHANGELOG.md,README.md,README,readme.md,readme}",
       "!**/node_modules/*/{test,__tests__,tests,powered-test,example,examples}",
       "!**/node_modules/*.d.ts",
