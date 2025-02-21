@@ -32,10 +32,21 @@ yarn postpackage
 ```bash
 yarn test
 ```
+### If you are on a 32 bit ARM system and getting a no native build was found error, you need to rebuild the native modules for the ARMv7l architecture using the following command:
+```bash
+yarn rebuild-native-modules-arm
+```
+
 4. Compile the additional dependencies and package the app (untested on Mac OS platforms, so make an issue if there is a problem)
 ```bash
 yarn package
 ```
+### Other flags are supported for the build process:
+
+`--new-release` - builds a new release then packages into a archive file depending on the platform
+`--pi-apps` - builds a version of the app for Pi-Apps (ideally use the --new-release flag when using this so that you have a new release for uploading on release page if you are a maintainer)
+`--time-sync` - delays the time present on appVersion.info by the next 10 minute interval (for example, if the build started at 12:00, and the build ends at 12:06, it will have file output it as 12:00)
+`--legacy-release` specify a Electron version to use for the release for this build by it's major version (for example, `--legacy-release 22` will use Electron 22.x.x, ideal for older systems that don't support the latest Electron version)
 ## License
 Due to the client having independent changes from the official version, it is under the MIT license.
 
