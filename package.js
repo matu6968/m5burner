@@ -82,6 +82,9 @@ const TEMP_BUILD_DIR = path.resolve('.temp-build');
 const LINUX_LAUNCHER_SOURCE = path.resolve('assets/linux-launcher/m5burner-launcher-linux.c');
 const LINUX_LAUNCHER_OUTPUT = path.resolve('assets/linux-launcher/m5burner-launcher');
 
+// Add this constant near the top with other constants
+const LINUX_LAUNCHER_SOURCE_PIAPPS = path.resolve('assets/linux-launcher/m5burner-launcher-linux-pi-apps.c');
+
 // Add these constants near the top
 const MINIMUM_ELECTRON_VERSION = 22; // Minimum supported version
 const MINIMUM_WINDOWS_PYTHON_VERSION = '3.9.0'; // Python version that dropped Win7 support
@@ -375,14 +378,22 @@ function createZipArchive(sourceDir, version, gitHash) {
     }
 }
 
-// Add this function after other helper functions
-function compileLauncherForLinux() {
+// Modify the compileLauncherForLinux function
+function compileLauncherForLinux(isPiApps = false) {
     if (process.platform !== 'linux') return;
 
     console.log('Compiling Linux launcher...');
+    
+    // Select the appropriate source file
+    const sourcePath = isPiApps ? LINUX_LAUNCHER_SOURCE_PIAPPS : LINUX_LAUNCHER_SOURCE;
+    
+    if (isPiApps) {
+        console.log('Building launcher with Pi-Apps configuration...');
+    }
+
     const compileCommand = 'gcc -o ' + 
                           `"${LINUX_LAUNCHER_OUTPUT}" ` +
-                          `"${LINUX_LAUNCHER_SOURCE}" ` +
+                          `"${sourcePath}" ` +
                           '`pkg-config --cflags --libs libnotify` ' +
                           '-Wall -O2';
     
@@ -452,7 +463,8 @@ async function setupLegacyElectron(version) {
 (async function main() {
     console.log('Starting the build and packaging process...');
 
-    // Parse legacy release flag
+    // Parse flags
+    const isPiApps = process.argv.includes('--pi-apps');
     const legacyFlag = process.argv.indexOf('--legacy-release');
     let originalElectronVersion = null;
     let isLegacyBuild = false;
@@ -465,8 +477,8 @@ async function setupLegacyElectron(version) {
     }
 
     try {
-        // Add this line early in the process
-        compileLauncherForLinux();
+        // Add this line early in the process with the flag
+        compileLauncherForLinux(isPiApps);
 
         // Create temp build directory
         cleanUp(TEMP_BUILD_DIR);

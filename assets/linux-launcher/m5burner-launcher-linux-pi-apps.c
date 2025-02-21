@@ -71,12 +71,12 @@ void launch_electron(const char *app_path, int use_no_sandbox) {
                 // SUID sandbox error
                 printf("Electron crashed due to a SUID sandbox issue.\n");
                 printf("To fix permanently, run:\n");
-                printf("  sudo chown root:root ./bin/m5burner/chrome-sandbox\n");
-                printf("  sudo chmod 4755 ./bin/m5burner/chrome-sandbox\n");
+                printf("  sudo chown root:root /opt/M5Burner/bin/chrome-sandbox\n");
+                printf("  sudo chmod 4755 /opt/M5Burner/bin/chrome-sandbox\n");
                 printf("For now, relaunching without sandboxing...\n");
 
                 send_notification("Electron Sandbox Issue", 
-                                  "Electron crashed due to a sandbox issue.\nRunning without sandboxing.");
+                               "Electron crashed due to a sandbox issue.\nRunning without sandboxing.");
 
                 launch_electron(app_path, 1); // Relaunch with --no-sandbox
             } else if (signal == SIGSEGV) {
@@ -92,14 +92,24 @@ void launch_electron(const char *app_path, int use_no_sandbox) {
             // Handle other non-zero exit codes
             printf("Electron exited with error code %d.\n", WEXITSTATUS(status));
             printf("Are you sure you have downloaded the right release?\n");
-            printf("This version of M5Burner is a normal release and expects the executable to be at ./bin/m5burner.\n");
-            send_notification("Electron Error", "Electron encountered an error and exited. Are you sure you downloaded the right release? This version of M5Burner is a normal release and expects the executable to be at ./bin/m5burner.");
+            printf("This version of M5Burner was built for Pi-Apps and expects the executable at /opt/M5Burner/bin/m5burner\n");
+            send_notification("Electron Error", 
+                           "Electron encountered an error and exited. This version of M5Burner was built for Pi-Apps and expects the executable at /opt/M5Burner/M5Burner");
         }
     }
 }
 
 int main() {
-    const char *electron_app = "./bin/m5burner";
+    const char *electron_app = "/opt/M5Burner/bin/m5burner";
+
+    // Check if the executable exists
+    if (access(electron_app, F_OK) == -1) {
+        printf("ERROR: M5Burner executable not found at %s\n", electron_app);
+        printf("This version of M5Burner was built for Pi-Apps and expects the executable at this location.\n");
+        send_notification("M5Burner Error", 
+                       "M5Burner executable not found. This version expects the executable at /opt/M5Burner/bin/m5burner");
+        exit(EXIT_FAILURE);
+    }
 
     // Check if user is in dialout or uucp group
     if (!is_user_in_group("dialout") && !is_user_in_group("uucp")) {
@@ -108,7 +118,7 @@ int main() {
         printf("  sudo usermod -aG dialout %s\n", getenv("USER"));
 
         send_notification("Serial Port Access Issue", 
-                          "You need to be in the 'dialout' or 'uucp' group.\nRun:\n  sudo usermod -aG dialout $USER");
+                       "You need to be in the 'dialout' or 'uucp' group.\nRun:\n  sudo usermod -aG dialout $USER");
         exit(EXIT_FAILURE);
     }
 
