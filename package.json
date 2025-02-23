@@ -29,7 +29,7 @@
     "test": "electron app.js",
     "create-update": "node scripts/create-update-package.js",
     "update-esptool": "node esptool-update.js",
-    "rebuild-native-modules-arm": "cd node_modules/usb && node-gyp rebuild --target=35.0.0-beta.7 --arch=arm --dist-url=https://electronjs.org/headers && cd ../serialport/node_modules/@serialport/bindings-cpp && node-gyp rebuild --target=35.0.0-beta.7 --arch=arm --dist-url=https://electronjs.org/headers && cd ../@serialport/bindings-cpp && node-gyp rebuild --target=35.0.0-beta.7 --arch=arm --dist-url=https://electronjs.org/headers"
+    "rebuild-native-modules-arm": "cd node_modules/usb && node-gyp rebuild --target=35.0.0-beta.7 --arch=arm --dist-url=https://electronjs.org/headers && cd ../serialport/node_modules/@serialport/bindings-cpp && node-gyp rebuild --target=35.0.0-beta.7 --arch=arm --dist-url=https://electronjs.org/headers && cd ../../../../@serialport/bindings-cpp && node-gyp rebuild --target=35.0.0-beta.7 --arch=arm --dist-url=https://electronjs.org/headers"
   },
   "build": {
     "appId": "com.m5stack.m5burner",

@@ -41,12 +41,16 @@ yarn rebuild-native-modules-arm
 ```bash
 yarn package
 ```
-### Other flags are supported for the build process:
+### Other flags are supported for the build process that can be mixed with eachother:
 
 `--new-release` - builds a new release then packages into a archive file depending on the platform
-`--pi-apps` - builds a version of the app for Pi-Apps (ideally use the --new-release flag when using this so that you have a new release for uploading on release page if you are a maintainer)
-`--time-sync` - delays the time present on appVersion.info by the next 10 minute interval (for example, if the build started at 12:00, and the build ends at 12:06, it will have file output it as 12:00)
-`--legacy-release` specify a Electron version to use for the release for this build by it's major version (for example, `--legacy-release 22` will use Electron 22.x.x, ideal for older systems that don't support the latest Electron version)
+
+`--pi-apps` - builds a version of the app for Pi-Apps by building the launcher to use the install paths oriented for Pi-Apps (ideally use the `--new-release` flag when using this so that you have a new release for uploading on release page if you are a maintainer for updating the app on Pi-Apps)
+
+`--time-sync` - delays the time present on appVersion.info by the next 10 minute interval (for example, if the build started at 12:06, it will have file output it as 12:00)
+
+`--legacy-release` specify a Electron version to use for the release for this build only by it's major version (for example, `--legacy-release 22` will use Electron 22.x.x, ideal for older systems that don't support the latest Electron version, though this will lack any security updates for Electron if the Electron version selected is EOL)
+
 ## License
 Due to the client having independent changes from the official version, it is under the MIT license.
 
