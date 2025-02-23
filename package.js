@@ -343,6 +343,13 @@ function createZipArchive(sourceDir, version, gitHash) {
         fileName += `-${gitHash}`;
     }
 
+    // Add pi-apps suffix only for Linux when both flags are present
+    if (process.platform === 'linux' && 
+        process.argv.includes('--pi-apps') && 
+        process.argv.includes('--new-release')) {
+        fileName += '-pi-apps';
+    }
+
     if (process.platform === 'darwin') {
         // For macOS, move and rename the DMG from electron-builder
         const archSuffix = ARCH === 'arm64' ? '-arm64' : '';
