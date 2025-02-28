@@ -15,7 +15,7 @@
     "usb": "^2.14.0"
   },
   "devDependencies": {
-    "electron": "35.0.0-beta.10",
+    "electron": "35.0.0-beta.12",
     "electron-builder": "^25.1.8"
   },
   "optionalDependencies": {
