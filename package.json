@@ -6,7 +6,7 @@
   "main": "app.js",
   "author": "M5Stack",
   "dependencies": {
-    "@electron/rebuild": "^3.7.1",
+    "@electron/rebuild": "^4.0.0",
     "@electron/remote": "^2.1.2",
     "@serialport/bindings-cpp": "^13.0.1",
     "axios": "^1.7.9",
