@@ -1,6 +1,3 @@
-from __future__ import annotations
-
-import collections.abc as cabc
 import os
 import re
 import sys
@@ -33,10 +30,10 @@ def _posixify(name: str) -> str:
     return "-".join(name.split()).lower()
 
 
-def safecall(func: t.Callable[P, R]) -> t.Callable[P, R | None]:
+def safecall(func: "t.Callable[P, R]") -> "t.Callable[P, t.Optional[R]]":
     """Wraps a function so that it swallows exceptions."""
 
-    def wrapper(*args: P.args, **kwargs: P.kwargs) -> R | None:
+    def wrapper(*args: "P.args", **kwargs: "P.kwargs") -> t.Optional[R]:
         try:
             return func(*args, **kwargs)
         except Exception:
@@ -115,10 +112,10 @@ class LazyFile:
 
     def __init__(
         self,
-        filename: str | os.PathLike[str],
+        filename: t.Union[str, "os.PathLike[str]"],
         mode: str = "r",
-        encoding: str | None = None,
-        errors: str | None = "strict",
+        encoding: t.Optional[str] = None,
+        errors: t.Optional[str] = "strict",
         atomic: bool = False,
     ):
         self.name: str = os.fspath(filename)
@@ -126,7 +123,7 @@ class LazyFile:
         self.encoding = encoding
         self.errors = errors
         self.atomic = atomic
-        self._f: t.IO[t.Any] | None
+        self._f: t.Optional[t.IO[t.Any]]
         self.should_close: bool
 
         if self.name == "-":
@@ -178,18 +175,18 @@ class LazyFile:
         if self.should_close:
             self.close()
 
-    def __enter__(self) -> LazyFile:
+    def __enter__(self) -> "LazyFile":
         return self
 
     def __exit__(
         self,
-        exc_type: type[BaseException] | None,
-        exc_value: BaseException | None,
-        tb: TracebackType | None,
+        exc_type: t.Optional[t.Type[BaseException]],
+        exc_value: t.Optional[BaseException],
+        tb: t.Optional[TracebackType],
     ) -> None:
         self.close_intelligently()
 
-    def __iter__(self) -> cabc.Iterator[t.AnyStr]:
+    def __iter__(self) -> t.Iterator[t.AnyStr]:
         self.open()
         return iter(self._f)  # type: ignore
 
@@ -201,30 +198,30 @@ class KeepOpenFile:
     def __getattr__(self, name: str) -> t.Any:
         return getattr(self._file, name)
 
-    def __enter__(self) -> KeepOpenFile:
+    def __enter__(self) -> "KeepOpenFile":
         return self
 
     def __exit__(
         self,
-        exc_type: type[BaseException] | None,
-        exc_value: BaseException | None,
-        tb: TracebackType | None,
+        exc_type: t.Optional[t.Type[BaseException]],
+        exc_value: t.Optional[BaseException],
+        tb: t.Optional[TracebackType],
     ) -> None:
         pass
 
     def __repr__(self) -> str:
         return repr(self._file)
 
-    def __iter__(self) -> cabc.Iterator[t.AnyStr]:
+    def __iter__(self) -> t.Iterator[t.AnyStr]:
         return iter(self._file)
 
 
 def echo(
-    message: t.Any | None = None,
-    file: t.IO[t.Any] | None = None,
+    message: t.Optional[t.Any] = None,
+    file: t.Optional[t.IO[t.Any]] = None,
     nl: bool = True,
     err: bool = False,
-    color: bool | None = None,
+    color: t.Optional[bool] = None,
 ) -> None:
     """Print a message and newline to stdout or a file. This should be
     used instead of :func:`print` because it provides better support
@@ -277,7 +274,7 @@ def echo(
 
     # Convert non bytes/text into the native string type.
     if message is not None and not isinstance(message, (str, bytes, bytearray)):
-        out: str | bytes | None = str(message)
+        out: t.Optional[t.Union[str, bytes]] = str(message)
     else:
         out = message
 
@@ -322,7 +319,7 @@ def echo(
     file.flush()
 
 
-def get_binary_stream(name: t.Literal["stdin", "stdout", "stderr"]) -> t.BinaryIO:
+def get_binary_stream(name: "te.Literal['stdin', 'stdout', 'stderr']") -> t.BinaryIO:
     """Returns a system stream for byte processing.
 
     :param name: the name of the stream to open.  Valid names are ``'stdin'``,
@@ -335,9 +332,9 @@ def get_binary_stream(name: t.Literal["stdin", "stdout", "stderr"]) -> t.BinaryI
 
 
 def get_text_stream(
-    name: t.Literal["stdin", "stdout", "stderr"],
-    encoding: str | None = None,
-    errors: str | None = "strict",
+    name: "te.Literal['stdin', 'stdout', 'stderr']",
+    encoding: t.Optional[str] = None,
+    errors: t.Optional[str] = "strict",
 ) -> t.TextIO:
     """Returns a system stream for text processing.  This usually returns
     a wrapped stream around a binary stream returned from
@@ -356,10 +353,10 @@ def get_text_stream(
 
 
 def open_file(
-    filename: str | os.PathLike[str],
+    filename: t.Union[str, "os.PathLike[str]"],
     mode: str = "r",
-    encoding: str | None = None,
-    errors: str | None = "strict",
+    encoding: t.Optional[str] = None,
+    errors: t.Optional[str] = "strict",
     lazy: bool = False,
     atomic: bool = False,
 ) -> t.IO[t.Any]:
@@ -393,19 +390,19 @@ def open_file(
     """
     if lazy:
         return t.cast(
-            "t.IO[t.Any]", LazyFile(filename, mode, encoding, errors, atomic=atomic)
+            t.IO[t.Any], LazyFile(filename, mode, encoding, errors, atomic=atomic)
         )
 
     f, should_close = open_stream(filename, mode, encoding, errors, atomic=atomic)
 
     if not should_close:
-        f = t.cast("t.IO[t.Any]", KeepOpenFile(f))
+        f = t.cast(t.IO[t.Any], KeepOpenFile(f))
 
     return f
 
 
 def format_filename(
-    filename: str | bytes | os.PathLike[str] | os.PathLike[bytes],
+    filename: "t.Union[str, bytes, os.PathLike[str], os.PathLike[bytes]]",
     shorten: bool = False,
 ) -> str:
     """Format a filename as a string for display. Ensures the filename can be
@@ -521,7 +518,7 @@ class PacifyFlushWrapper:
 
 
 def _detect_program_name(
-    path: str | None = None, _main: ModuleType | None = None
+    path: t.Optional[str] = None, _main: t.Optional[ModuleType] = None
 ) -> str:
     """Determine the command used to run the program, for use in help
     text. If a file or entry point was executed, the file name is
@@ -576,12 +573,12 @@ def _detect_program_name(
 
 
 def _expand_args(
-    args: cabc.Iterable[str],
+    args: t.Iterable[str],
     *,
     user: bool = True,
     env: bool = True,
     glob_recursive: bool = True,
-) -> list[str]:
+) -> t.List[str]:
     """Simulate Unix shell expansion with Python functions.
 
     See :func:`glob.glob`, :func:`os.path.expanduser`, and

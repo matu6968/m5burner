@@ -1,12 +1,8 @@
-from __future__ import annotations
-
-import collections.abc as cabc
 import inspect
 import io
 import itertools
 import sys
 import typing as t
-from contextlib import AbstractContextManager
 from gettext import gettext as _
 
 from ._compat import isatty
@@ -61,9 +57,9 @@ def _build_prompt(
     text: str,
     suffix: str,
     show_default: bool = False,
-    default: t.Any | None = None,
+    default: t.Optional[t.Any] = None,
     show_choices: bool = True,
-    type: ParamType | None = None,
+    type: t.Optional[ParamType] = None,
 ) -> str:
     prompt = text
     if type is not None and show_choices and isinstance(type, Choice):
@@ -82,11 +78,11 @@ def _format_default(default: t.Any) -> t.Any:
 
 def prompt(
     text: str,
-    default: t.Any | None = None,
+    default: t.Optional[t.Any] = None,
     hide_input: bool = False,
-    confirmation_prompt: bool | str = False,
-    type: ParamType | t.Any | None = None,
-    value_proc: t.Callable[[str], t.Any] | None = None,
+    confirmation_prompt: t.Union[bool, str] = False,
+    type: t.Optional[t.Union[ParamType, t.Any]] = None,
+    value_proc: t.Optional[t.Callable[[str], t.Any]] = None,
     prompt_suffix: str = ": ",
     show_default: bool = True,
     err: bool = False,
@@ -193,7 +189,7 @@ def prompt(
 
 def confirm(
     text: str,
-    default: bool | None = False,
+    default: t.Optional[bool] = False,
     abort: bool = False,
     prompt_suffix: str = ": ",
     show_default: bool = True,
@@ -253,8 +249,8 @@ def confirm(
 
 
 def echo_via_pager(
-    text_or_generator: cabc.Iterable[str] | t.Callable[[], cabc.Iterable[str]] | str,
-    color: bool | None = None,
+    text_or_generator: t.Union[t.Iterable[str], t.Callable[[], t.Iterable[str]], str],
+    color: t.Optional[bool] = None,
 ) -> None:
     """This function takes a text and shows it via an environment specific
     pager on stdout.
@@ -270,11 +266,11 @@ def echo_via_pager(
     color = resolve_color_default(color)
 
     if inspect.isgeneratorfunction(text_or_generator):
-        i = t.cast("t.Callable[[], cabc.Iterable[str]]", text_or_generator)()
+        i = t.cast(t.Callable[[], t.Iterable[str]], text_or_generator)()
     elif isinstance(text_or_generator, str):
         i = [text_or_generator]
     else:
-        i = iter(t.cast("cabc.Iterable[str]", text_or_generator))
+        i = iter(t.cast(t.Iterable[str], text_or_generator))
 
     # convert every element of i to a text type if necessary
     text_generator = (el if isinstance(el, str) else str(el) for el in i)
@@ -284,65 +280,23 @@ def echo_via_pager(
     return pager(itertools.chain(text_generator, "\n"), color)
 
 
-@t.overload
 def progressbar(
-    *,
-    length: int,
-    label: str | None = None,
-    hidden: bool = False,
+    iterable: t.Optional[t.Iterable[V]] = None,
+    length: t.Optional[int] = None,
+    label: t.Optional[str] = None,
     show_eta: bool = True,
-    show_percent: bool | None = None,
+    show_percent: t.Optional[bool] = None,
     show_pos: bool = False,
+    item_show_func: t.Optional[t.Callable[[t.Optional[V]], t.Optional[str]]] = None,
     fill_char: str = "#",
     empty_char: str = "-",
     bar_template: str = "%(label)s  [%(bar)s]  %(info)s",
     info_sep: str = "  ",
     width: int = 36,
-    file: t.TextIO | None = None,
-    color: bool | None = None,
+    file: t.Optional[t.TextIO] = None,
+    color: t.Optional[bool] = None,
     update_min_steps: int = 1,
-) -> ProgressBar[int]: ...
-
-
-@t.overload
-def progressbar(
-    iterable: cabc.Iterable[V] | None = None,
-    length: int | None = None,
-    label: str | None = None,
-    hidden: bool = False,
-    show_eta: bool = True,
-    show_percent: bool | None = None,
-    show_pos: bool = False,
-    item_show_func: t.Callable[[V | None], str | None] | None = None,
-    fill_char: str = "#",
-    empty_char: str = "-",
-    bar_template: str = "%(label)s  [%(bar)s]  %(info)s",
-    info_sep: str = "  ",
-    width: int = 36,
-    file: t.TextIO | None = None,
-    color: bool | None = None,
-    update_min_steps: int = 1,
-) -> ProgressBar[V]: ...
-
-
-def progressbar(
-    iterable: cabc.Iterable[V] | None = None,
-    length: int | None = None,
-    label: str | None = None,
-    hidden: bool = False,
-    show_eta: bool = True,
-    show_percent: bool | None = None,
-    show_pos: bool = False,
-    item_show_func: t.Callable[[V | None], str | None] | None = None,
-    fill_char: str = "#",
-    empty_char: str = "-",
-    bar_template: str = "%(label)s  [%(bar)s]  %(info)s",
-    info_sep: str = "  ",
-    width: int = 36,
-    file: t.TextIO | None = None,
-    color: bool | None = None,
-    update_min_steps: int = 1,
-) -> ProgressBar[V]:
+) -> "ProgressBar[V]":
     """This function creates an iterable context manager that can be used
     to iterate over something while showing a progress bar.  It will
     either iterate over the `iterable` or `length` items (that are counted
@@ -405,9 +359,6 @@ def progressbar(
                    length.  If an iterable is not provided the progress bar
                    will iterate over a range of that length.
     :param label: the label to show next to the progress bar.
-    :param hidden: hide the progressbar. Defaults to ``False``. When no tty is
-        detected, it will only print the progressbar label. Setting this to
-        ``False`` also disables that.
     :param show_eta: enables or disables the estimated time display.  This is
                      automatically disabled if the length cannot be
                      determined.
@@ -440,9 +391,6 @@ def progressbar(
     :param update_min_steps: Render only when this many updates have
         completed. This allows tuning for very fast iterators.
 
-    .. versionadded:: 8.2
-        The ``hidden`` argument.
-
     .. versionchanged:: 8.0
         Output is shown even if execution time is less than 0.5 seconds.
 
@@ -454,10 +402,11 @@ def progressbar(
         in 7.0 that removed all output.
 
     .. versionadded:: 8.0
-       The ``update_min_steps`` parameter.
+       Added the ``update_min_steps`` parameter.
 
-    .. versionadded:: 4.0
-        The ``color`` parameter and ``update`` method.
+    .. versionchanged:: 4.0
+        Added the ``color`` parameter. Added the ``update`` method to
+        the object.
 
     .. versionadded:: 2.0
     """
@@ -467,7 +416,6 @@ def progressbar(
     return ProgressBar(
         iterable=iterable,
         length=length,
-        hidden=hidden,
         show_eta=show_eta,
         show_percent=show_percent,
         show_pos=show_pos,
@@ -498,7 +446,9 @@ def clear() -> None:
     echo("\033[2J\033[1;1H", nl=False)
 
 
-def _interpret_color(color: int | tuple[int, int, int] | str, offset: int = 0) -> str:
+def _interpret_color(
+    color: t.Union[int, t.Tuple[int, int, int], str], offset: int = 0
+) -> str:
     if isinstance(color, int):
         return f"{38 + offset};5;{color:d}"
 
@@ -511,16 +461,16 @@ def _interpret_color(color: int | tuple[int, int, int] | str, offset: int = 0) -
 
 def style(
     text: t.Any,
-    fg: int | tuple[int, int, int] | str | None = None,
-    bg: int | tuple[int, int, int] | str | None = None,
-    bold: bool | None = None,
-    dim: bool | None = None,
-    underline: bool | None = None,
-    overline: bool | None = None,
-    italic: bool | None = None,
-    blink: bool | None = None,
-    reverse: bool | None = None,
-    strikethrough: bool | None = None,
+    fg: t.Optional[t.Union[int, t.Tuple[int, int, int], str]] = None,
+    bg: t.Optional[t.Union[int, t.Tuple[int, int, int], str]] = None,
+    bold: t.Optional[bool] = None,
+    dim: t.Optional[bool] = None,
+    underline: t.Optional[bool] = None,
+    overline: t.Optional[bool] = None,
+    italic: t.Optional[bool] = None,
+    blink: t.Optional[bool] = None,
+    reverse: t.Optional[bool] = None,
+    strikethrough: t.Optional[bool] = None,
     reset: bool = True,
 ) -> str:
     """Styles a text with ANSI styles and returns the new string.  By
@@ -651,11 +601,11 @@ def unstyle(text: str) -> str:
 
 
 def secho(
-    message: t.Any | None = None,
-    file: t.IO[t.AnyStr] | None = None,
+    message: t.Optional[t.Any] = None,
+    file: t.Optional[t.IO[t.AnyStr]] = None,
     nl: bool = True,
     err: bool = False,
-    color: bool | None = None,
+    color: t.Optional[bool] = None,
     **styles: t.Any,
 ) -> None:
     """This function combines :func:`echo` and :func:`style` into one
@@ -684,45 +634,14 @@ def secho(
     return echo(message, file=file, nl=nl, err=err, color=color)
 
 
-@t.overload
 def edit(
-    text: bytes | bytearray,
-    editor: str | None = None,
-    env: cabc.Mapping[str, str] | None = None,
-    require_save: bool = False,
-    extension: str = ".txt",
-) -> bytes | None: ...
-
-
-@t.overload
-def edit(
-    text: str,
-    editor: str | None = None,
-    env: cabc.Mapping[str, str] | None = None,
+    text: t.Optional[t.AnyStr] = None,
+    editor: t.Optional[str] = None,
+    env: t.Optional[t.Mapping[str, str]] = None,
     require_save: bool = True,
     extension: str = ".txt",
-) -> str | None: ...
-
-
-@t.overload
-def edit(
-    text: None = None,
-    editor: str | None = None,
-    env: cabc.Mapping[str, str] | None = None,
-    require_save: bool = True,
-    extension: str = ".txt",
-    filename: str | cabc.Iterable[str] | None = None,
-) -> None: ...
-
-
-def edit(
-    text: str | bytes | bytearray | None = None,
-    editor: str | None = None,
-    env: cabc.Mapping[str, str] | None = None,
-    require_save: bool = True,
-    extension: str = ".txt",
-    filename: str | cabc.Iterable[str] | None = None,
-) -> str | bytes | bytearray | None:
+    filename: t.Optional[str] = None,
+) -> t.Optional[t.AnyStr]:
     r"""Edits the given text in the defined editor.  If an editor is given
     (should be the full path to the executable but the regular operating
     system search path is used for finding the executable) it overrides
@@ -748,16 +667,7 @@ def edit(
                       highlighting.
     :param filename: if provided it will edit this file instead of the
                      provided text contents.  It will not use a temporary
-                     file as an indirection in that case. If the editor supports
-                     editing multiple files at once, a sequence of files may be
-                     passed as well. Invoke `click.file` once per file instead
-                     if multiple files cannot be managed at once or editing the
-                     files serially is desired.
-
-    .. versionchanged:: 8.2.0
-        ``filename`` now accepts any ``Iterable[str]`` in addition to a ``str``
-        if the ``editor`` supports editing multiple files at once.
-
+                     file as an indirection in that case.
     """
     from ._termui_impl import Editor
 
@@ -766,10 +676,7 @@ def edit(
     if filename is None:
         return ed.edit(text)
 
-    if isinstance(filename, str):
-        filename = (filename,)
-
-    ed.edit_files(filenames=filename)
+    ed.edit_file(filename)
     return None
 
 
@@ -804,7 +711,7 @@ def launch(url: str, wait: bool = False, locate: bool = False) -> int:
 
 # If this is provided, getchar() calls into this instead.  This is used
 # for unittesting purposes.
-_getchar: t.Callable[[bool], str] | None = None
+_getchar: t.Optional[t.Callable[[bool], str]] = None
 
 
 def getchar(echo: bool = False) -> str:
@@ -837,13 +744,13 @@ def getchar(echo: bool = False) -> str:
     return _getchar(echo)
 
 
-def raw_terminal() -> AbstractContextManager[int]:
+def raw_terminal() -> t.ContextManager[int]:
     from ._termui_impl import raw_terminal as f
 
     return f()
 
 
-def pause(info: str | None = None, err: bool = False) -> None:
+def pause(info: t.Optional[str] = None, err: bool = False) -> None:
     """This command stops execution and waits for the user to press any
     key to continue.  This is similar to the Windows batch "pause"
     command.  If the program is not run through a terminal, this command

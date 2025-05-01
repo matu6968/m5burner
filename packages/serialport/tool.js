@@ -40,7 +40,11 @@ function getMac(port) {
     if(os.platform() === 'darwin' || os.platform() === 'linux') {
       comPrefix = '/dev/'
     }
-    let process = runBurnScript(os.platform(), '', ['--port', comPrefix + port, 'read_mac'])
+    if(os.platform() === 'darwin') {
+      let process = runBurnScript(os.platform(), '', ['--port', comPrefix + port, 'read_mac'])
+    } else {
+      let process = runBurnScript(os.platform(), '', ['--port', comPrefix + port, 'read-mac'])
+    }
     pid = process.pid
     let output = ''
     process.stdout.on('data', chunk => {
@@ -62,7 +66,7 @@ function getMac(port) {
 
 function kill() {
   if(os.platform() === 'win32') {
-    childProcess.spawnSync('taskkill', ['/IM', 'exptool.exe', '-f'])
+    childProcess.spawnSync('taskkill', ['/IM', 'esptool.exe', '-f'])
   }
   else if(os.platform() === 'linux') {
     childProcess.spawnSync('kill', ['-9', pid])
@@ -85,7 +89,18 @@ function generateBasicConfig(com, baudRate, device) {
     ]
   }
 
-  return [
+  if(os.platform() === 'darwin') {
+    return [
+    '--chip', 'auto',
+    '--port', comPrefix + com,
+    '--baud', baudRate,
+    '--before', 'default-reset',
+    'write_flash', '-z',
+    '--flash_mode', 'dio',
+    '--flash_freq', '80m',
+    '--flash_size', 'detect'
+    ]
+  } else return [
     '--chip', 'auto',
     '--port', comPrefix + com,
     '--baud', baudRate,
@@ -285,10 +300,12 @@ function readFirmware(opts, send) {
     comPrefix = '/dev/'
   }
   let process
-  if(os.platform() === 'win32') {
-    process = childProcess.spawn(ESPTOOL_EXE, ['--port', opts.port, '--baud', opts.baud, 'read_flash', 0, size2address[opts.size], opts.path])
+  if (os.platform() === 'win32') {
+    process = childProcess.spawn(ESPTOOL_EXE, ['--port', opts.port, '--baud', opts.baud, 'read-flash', 0, size2address[opts.size], opts.path])
+  } else if (os.platform() === 'darwin') { 
+      process = childProcess.spawn(global.pythonExec, [ESPTOOL_PY, '--port', comPrefix + opts.port, '--baud', opts.baud, 'read_flash', 0, size2address[opts.size], opts.path])
   } else {
-    process = childProcess.spawn(global.pythonExec, [ESPTOOL_PY, '--port', comPrefix + opts.port, '--baud', opts.baud, 'read_flash', 0, size2address[opts.size], opts.path])
+    process = childProcess.spawn(global.pythonExec, [ESPTOOL_PY, '--port', comPrefix + opts.port, '--baud', opts.baud, 'read-flash', 0, size2address[opts.size], opts.path])
   }
 
   pid = process.pid

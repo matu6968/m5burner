@@ -22,9 +22,6 @@ Copyright 2002-2006 Python Software Foundation. All rights reserved.
 # maintained by the Python Software Foundation.
 # Copyright 2001-2006 Gregory P. Ward
 # Copyright 2002-2006 Python Software Foundation
-from __future__ import annotations
-
-import collections.abc as cabc
 import typing as t
 from collections import deque
 from gettext import gettext as _
@@ -36,6 +33,8 @@ from .exceptions import NoSuchOption
 from .exceptions import UsageError
 
 if t.TYPE_CHECKING:
+    import typing_extensions as te
+
     from .core import Argument as CoreArgument
     from .core import Context
     from .core import Option as CoreOption
@@ -50,8 +49,8 @@ _flag_needs_value = object()
 
 
 def _unpack_args(
-    args: cabc.Sequence[str], nargs_spec: cabc.Sequence[int]
-) -> tuple[cabc.Sequence[str | cabc.Sequence[str | None] | None], list[str]]:
+    args: t.Sequence[str], nargs_spec: t.Sequence[int]
+) -> t.Tuple[t.Sequence[t.Union[str, t.Sequence[t.Optional[str]], None]], t.List[str]]:
     """Given an iterable of arguments and an iterable of nargs specifications,
     it returns a tuple with all the unpacked arguments at the first index
     and all remaining arguments as the second.
@@ -63,10 +62,10 @@ def _unpack_args(
     """
     args = deque(args)
     nargs_spec = deque(nargs_spec)
-    rv: list[str | tuple[str | None, ...] | None] = []
-    spos: int | None = None
+    rv: t.List[t.Union[str, t.Tuple[t.Optional[str], ...], None]] = []
+    spos: t.Optional[int] = None
 
-    def _fetch(c: deque[V]) -> V | None:
+    def _fetch(c: "te.Deque[V]") -> t.Optional[V]:
         try:
             if spos is None:
                 return c.popleft()
@@ -109,7 +108,7 @@ def _unpack_args(
     return tuple(rv), list(args)
 
 
-def _split_opt(opt: str) -> tuple[str, str]:
+def split_opt(opt: str) -> t.Tuple[str, str]:
     first = opt[:1]
     if first.isalnum():
         return "", opt
@@ -118,29 +117,63 @@ def _split_opt(opt: str) -> tuple[str, str]:
     return first, opt[1:]
 
 
-def _normalize_opt(opt: str, ctx: Context | None) -> str:
+def normalize_opt(opt: str, ctx: t.Optional["Context"]) -> str:
     if ctx is None or ctx.token_normalize_func is None:
         return opt
-    prefix, opt = _split_opt(opt)
+    prefix, opt = split_opt(opt)
     return f"{prefix}{ctx.token_normalize_func(opt)}"
 
 
-class _Option:
+def split_arg_string(string: str) -> t.List[str]:
+    """Split an argument string as with :func:`shlex.split`, but don't
+    fail if the string is incomplete. Ignores a missing closing quote or
+    incomplete escape sequence and uses the partial token as-is.
+
+    .. code-block:: python
+
+        split_arg_string("example 'my file")
+        ["example", "my file"]
+
+        split_arg_string("example my\\")
+        ["example", "my"]
+
+    :param string: String to split.
+    """
+    import shlex
+
+    lex = shlex.shlex(string, posix=True)
+    lex.whitespace_split = True
+    lex.commenters = ""
+    out = []
+
+    try:
+        for token in lex:
+            out.append(token)
+    except ValueError:
+        # Raised when end-of-string is reached in an invalid state. Use
+        # the partial token as-is. The quote or escape character is in
+        # lex.state, not lex.token.
+        out.append(lex.token)
+
+    return out
+
+
+class Option:
     def __init__(
         self,
-        obj: CoreOption,
-        opts: cabc.Sequence[str],
-        dest: str | None,
-        action: str | None = None,
+        obj: "CoreOption",
+        opts: t.Sequence[str],
+        dest: t.Optional[str],
+        action: t.Optional[str] = None,
         nargs: int = 1,
-        const: t.Any | None = None,
+        const: t.Optional[t.Any] = None,
     ):
         self._short_opts = []
         self._long_opts = []
-        self.prefixes: set[str] = set()
+        self.prefixes: t.Set[str] = set()
 
         for opt in opts:
-            prefix, value = _split_opt(opt)
+            prefix, value = split_opt(opt)
             if not prefix:
                 raise ValueError(f"Invalid start character for option ({opt})")
             self.prefixes.add(prefix[0])
@@ -163,7 +196,7 @@ class _Option:
     def takes_value(self) -> bool:
         return self.action in ("store", "append")
 
-    def process(self, value: t.Any, state: _ParsingState) -> None:
+    def process(self, value: t.Any, state: "ParsingState") -> None:
         if self.action == "store":
             state.opts[self.dest] = value  # type: ignore
         elif self.action == "store_const":
@@ -179,16 +212,16 @@ class _Option:
         state.order.append(self.obj)
 
 
-class _Argument:
-    def __init__(self, obj: CoreArgument, dest: str | None, nargs: int = 1):
+class Argument:
+    def __init__(self, obj: "CoreArgument", dest: t.Optional[str], nargs: int = 1):
         self.dest = dest
         self.nargs = nargs
         self.obj = obj
 
     def process(
         self,
-        value: str | cabc.Sequence[str | None] | None,
-        state: _ParsingState,
+        value: t.Union[t.Optional[str], t.Sequence[t.Optional[str]]],
+        state: "ParsingState",
     ) -> None:
         if self.nargs > 1:
             assert value is not None
@@ -211,15 +244,15 @@ class _Argument:
         state.order.append(self.obj)
 
 
-class _ParsingState:
-    def __init__(self, rargs: list[str]) -> None:
-        self.opts: dict[str, t.Any] = {}
-        self.largs: list[str] = []
+class ParsingState:
+    def __init__(self, rargs: t.List[str]) -> None:
+        self.opts: t.Dict[str, t.Any] = {}
+        self.largs: t.List[str] = []
         self.rargs = rargs
-        self.order: list[CoreParameter] = []
+        self.order: t.List[CoreParameter] = []
 
 
-class _OptionParser:
+class OptionParser:
     """The option parser is an internal class that is ultimately used to
     parse options and arguments.  It's modelled after optparse and brings
     a similar but vastly simplified API.  It should generally not be used
@@ -231,12 +264,9 @@ class _OptionParser:
 
     :param ctx: optionally the :class:`~click.Context` where this parser
                 should go with.
-
-    .. deprecated:: 8.2
-        Will be removed in Click 9.0.
     """
 
-    def __init__(self, ctx: Context | None = None) -> None:
+    def __init__(self, ctx: t.Optional["Context"] = None) -> None:
         #: The :class:`~click.Context` for this parser.  This might be
         #: `None` for some advanced use cases.
         self.ctx = ctx
@@ -255,19 +285,19 @@ class _OptionParser:
             self.allow_interspersed_args = ctx.allow_interspersed_args
             self.ignore_unknown_options = ctx.ignore_unknown_options
 
-        self._short_opt: dict[str, _Option] = {}
-        self._long_opt: dict[str, _Option] = {}
+        self._short_opt: t.Dict[str, Option] = {}
+        self._long_opt: t.Dict[str, Option] = {}
         self._opt_prefixes = {"-", "--"}
-        self._args: list[_Argument] = []
+        self._args: t.List[Argument] = []
 
     def add_option(
         self,
-        obj: CoreOption,
-        opts: cabc.Sequence[str],
-        dest: str | None,
-        action: str | None = None,
+        obj: "CoreOption",
+        opts: t.Sequence[str],
+        dest: t.Optional[str],
+        action: t.Optional[str] = None,
         nargs: int = 1,
-        const: t.Any | None = None,
+        const: t.Optional[t.Any] = None,
     ) -> None:
         """Adds a new option named `dest` to the parser.  The destination
         is not inferred (unlike with optparse) and needs to be explicitly
@@ -277,32 +307,34 @@ class _OptionParser:
         The `obj` can be used to identify the option in the order list
         that is returned from the parser.
         """
-        opts = [_normalize_opt(opt, self.ctx) for opt in opts]
-        option = _Option(obj, opts, dest, action=action, nargs=nargs, const=const)
+        opts = [normalize_opt(opt, self.ctx) for opt in opts]
+        option = Option(obj, opts, dest, action=action, nargs=nargs, const=const)
         self._opt_prefixes.update(option.prefixes)
         for opt in option._short_opts:
             self._short_opt[opt] = option
         for opt in option._long_opts:
             self._long_opt[opt] = option
 
-    def add_argument(self, obj: CoreArgument, dest: str | None, nargs: int = 1) -> None:
+    def add_argument(
+        self, obj: "CoreArgument", dest: t.Optional[str], nargs: int = 1
+    ) -> None:
         """Adds a positional argument named `dest` to the parser.
 
         The `obj` can be used to identify the option in the order list
         that is returned from the parser.
         """
-        self._args.append(_Argument(obj, dest=dest, nargs=nargs))
+        self._args.append(Argument(obj, dest=dest, nargs=nargs))
 
     def parse_args(
-        self, args: list[str]
-    ) -> tuple[dict[str, t.Any], list[str], list[CoreParameter]]:
+        self, args: t.List[str]
+    ) -> t.Tuple[t.Dict[str, t.Any], t.List[str], t.List["CoreParameter"]]:
         """Parses positional arguments and returns ``(values, args, order)``
         for the parsed options and arguments as well as the leftover
         arguments if there are any.  The order is a list of objects as they
         appear on the command line.  If arguments appear multiple times they
         will be memorized multiple times as well.
         """
-        state = _ParsingState(args)
+        state = ParsingState(args)
         try:
             self._process_args_for_options(state)
             self._process_args_for_args(state)
@@ -311,7 +343,7 @@ class _OptionParser:
                 raise
         return state.opts, state.largs, state.order
 
-    def _process_args_for_args(self, state: _ParsingState) -> None:
+    def _process_args_for_args(self, state: ParsingState) -> None:
         pargs, args = _unpack_args(
             state.largs + state.rargs, [x.nargs for x in self._args]
         )
@@ -322,7 +354,7 @@ class _OptionParser:
         state.largs = args
         state.rargs = []
 
-    def _process_args_for_options(self, state: _ParsingState) -> None:
+    def _process_args_for_options(self, state: ParsingState) -> None:
         while state.rargs:
             arg = state.rargs.pop(0)
             arglen = len(arg)
@@ -359,7 +391,7 @@ class _OptionParser:
         # not a very interesting subset!
 
     def _match_long_opt(
-        self, opt: str, explicit_value: str | None, state: _ParsingState
+        self, opt: str, explicit_value: t.Optional[str], state: ParsingState
     ) -> None:
         if opt not in self._long_opt:
             from difflib import get_close_matches
@@ -388,14 +420,14 @@ class _OptionParser:
 
         option.process(value, state)
 
-    def _match_short_opt(self, arg: str, state: _ParsingState) -> None:
+    def _match_short_opt(self, arg: str, state: ParsingState) -> None:
         stop = False
         i = 1
         prefix = arg[0]
         unknown_options = []
 
         for ch in arg[1:]:
-            opt = _normalize_opt(f"{prefix}{ch}", self.ctx)
+            opt = normalize_opt(f"{prefix}{ch}", self.ctx)
             option = self._short_opt.get(opt)
             i += 1
 
@@ -429,7 +461,7 @@ class _OptionParser:
             state.largs.append(f"{prefix}{''.join(unknown_options)}")
 
     def _get_value_from_state(
-        self, option_name: str, option: _Option, state: _ParsingState
+        self, option_name: str, option: Option, state: ParsingState
     ) -> t.Any:
         nargs = option.nargs
 
@@ -466,7 +498,7 @@ class _OptionParser:
 
         return value
 
-    def _process_opts(self, arg: str, state: _ParsingState) -> None:
+    def _process_opts(self, arg: str, state: ParsingState) -> None:
         explicit_value = None
         # Long option handling happens in two parts.  The first part is
         # supporting explicitly attached values.  In any case, we will try
@@ -475,7 +507,7 @@ class _OptionParser:
             long_opt, explicit_value = arg.split("=", 1)
         else:
             long_opt = arg
-        norm_long_opt = _normalize_opt(long_opt, self.ctx)
+        norm_long_opt = normalize_opt(long_opt, self.ctx)
 
         # At this point we will match the (assumed) long option through
         # the long option matching code.  Note that this allows options
@@ -497,36 +529,3 @@ class _OptionParser:
                 raise
 
             state.largs.append(arg)
-
-
-def __getattr__(name: str) -> object:
-    import warnings
-
-    if name in {
-        "OptionParser",
-        "Argument",
-        "Option",
-        "split_opt",
-        "normalize_opt",
-        "ParsingState",
-    }:
-        warnings.warn(
-            f"'parser.{name}' is deprecated and will be removed in Click 9.0."
-            " The old parser is available in 'optparse'.",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-        return globals()[f"_{name}"]
-
-    if name == "split_arg_string":
-        from .shell_completion import split_arg_string
-
-        warnings.warn(
-            "Importing 'parser.split_arg_string' is deprecated, it will only be"
-            " available in 'shell_completion' in Click 9.0.",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-        return split_arg_string
-
-    raise AttributeError(name)
