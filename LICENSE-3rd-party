@@ -1,13 +1,14 @@
 Several other tools that are being used in M5Burner are 3rd party, it's license details are below:
 
-esptool.py and esptool (in deps_package/tool): GPL-2.0 (license: https://github.com/espressif/esptool/blob/master/LICENSE)
+esptool.py and esptool (in deps/tool): GPL-2.0 (license: https://github.com/espressif/esptool/blob/master/LICENSE)
 nvs_partition_gen: Apache-2.0 (license: https://github.com/espressif/esp-idf-nvs-partition-gen/blob/main/LICENSE)
-intelhex (in deps_package/tool): BSD-3-Clause (license: https://github.com/python-intelhex/intelhex/blob/master/LICENSE.txt)
-serial: (in deps_package/tool): BSD-3-Clause (license: https://github.com/pyserial/pyserial/blob/master/LICENSE.txt)
-rich_click (in deps_package/tool): MIT (license: https://github.com/ewels/rich-click/blob/main/LICENSE)
-rich (in deps_package/tool): MIT (license: https://github.com/Textualize/rich/blob/master/LICENSE)
-click (in deps_package/tool): BSD-3-Clause (license: https://github.com/pallets/click/blob/main/LICENSE.txt)
-kflash.py (in deps_package/tool): MIT (license: https://github.com/kendryte/kflash.py/blob/master/LICENSE)
+intelhex (in deps/tool): BSD-3-Clause (license: https://github.com/python-intelhex/intelhex/blob/master/LICENSE.txt)
+serial: (in deps/tool): BSD-3-Clause (license: https://github.com/pyserial/pyserial/blob/master/LICENSE.txt)
+rich_click (in deps/tool): MIT (license: https://github.com/ewels/rich-click/blob/main/LICENSE)
+rich (in deps/tool): MIT (license: https://github.com/Textualize/rich/blob/master/LICENSE)
+click (in deps/tool): BSD-3-Clause (license: https://github.com/pallets/click/blob/main/LICENSE.txt)
+kflash.py (in deps/tool): MIT (license: https://github.com/kendryte/kflash.py/blob/master/LICENSE)
+typing_extensions.py (in deps/tool): PSF (1st party Python module included since Python 3.10, license: https://github.com/python/typing_extensions/blob/main/LICENSE)
 
 The following files that are still proprietary to M5Stack but yet to be reverse engineered:
 deps/tool/esp32_board_identify.bin (M5Stack HW detection)
