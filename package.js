@@ -38,7 +38,7 @@ const getPlatformConfig = () => {
 const platformConfig = getPlatformConfig();
 const BASE_FOLDER = platformConfig.outputDir;
 const ELECTRON_BUILD_CMD = platformConfig.electronBuildCmd;
-const DOWNGRADE_ESPTOOL = 'node deps-updaters/esptool-update.js --support-below-py3.10'
+const DOWNGRADE_ESPTOOL = 'cd deps-updaters && node esptool-update.js --support-below-py3.10'
 const PYINSTALLER_CMD = 'pyinstaller --onefile esp-idf-nvs-partition-gen/esp_idf_nvs_partition_gen/nvs_partition_gen.py --distpath esp-idf-nvs-partition-gen/esp_idf_nvs_partition_gen/dist';
 const ELECTRON_OUTPUT = platformConfig.electronOutput;
 const BUILD_DIR = path.resolve('deps');
@@ -531,7 +531,7 @@ async function setupLegacyElectron(version) {
 
         // Compile and copy NVS tool to temp directory for macOS and also downgrade esptool due to breaking change on Python <3.10 support
         if (process.platform === 'darwin') {
-            HandleEsptoolDowngades();
+            HandleEsptoolDowngrades();
             console.log('Compiling ESP NVS tool with PyInstaller...');
             runCommand(PYINSTALLER_CMD);
             if (fs.existsSync(PYINSTALLER_BINARY)) {
