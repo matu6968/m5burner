@@ -38,6 +38,7 @@ const getPlatformConfig = () => {
 const platformConfig = getPlatformConfig();
 const BASE_FOLDER = platformConfig.outputDir;
 const ELECTRON_BUILD_CMD = platformConfig.electronBuildCmd;
+const DOWNGRADE_ESPTOOL = 'node deps-updaters/esptool-update.js --support-below-3.10'
 const PYINSTALLER_CMD = 'pyinstaller --onefile esp-idf-nvs-partition-gen/esp_idf_nvs_partition_gen/nvs_partition_gen.py --distpath esp-idf-nvs-partition-gen/esp_idf_nvs_partition_gen/dist';
 const ELECTRON_OUTPUT = platformConfig.electronOutput;
 const BUILD_DIR = path.resolve('deps');
@@ -142,10 +143,29 @@ function setupMacOSStructure() {
     }
 }
 
-// Add this helper function to check Python version
+// New function to handle esptool downgrades
+// It is there due to a recent change that broke Python <3.10 support
+// and still modern Mac OS (tested only on Sonoma and Sequoia) has Python 3.9 by default
+// https://github.com/espressif/esptool/commit/19f1beeb24437929933dab8d75d520c107f45295
+// The above commit just removed support for installing on Python <3.10 but didn't break it running on older versions until the commit below:
+// https://github.com/espressif/esptool/commit/d40fefa275dc4da28fdc747d2909a9ec29687ae8
+function HandleEsptoolDowngrades() {
+    if (process.platform !== 'darwin') return;
+        const pythonVersion = getPythonVersion();
+        if (pythonVersion <= "3.10") {
+             console.log('Downgrading esptool because you are running Mac OS and a old version of Python...');
+             runCommand(DOWNGRADE_ESPTOOL);
+    }
+}
+
+// Add this helper function to check Python version (on Mac explicitly check /usr/bin/python3 instead of anything else overwriting python3 in PATH)
 function getPythonVersion() {
     try {
-        const result = spawnSync('python', ['--version']);
+        if (process.platform == 'Darwin') {
+            const result = spawnSync('/usr/bin/python3', ['--version']);
+        } else {
+            const result = spawnSync('python', ['--version']);
+        }
         if (result.status === 0) {
             const version = result.stdout.toString().trim().split(' ')[1];
             return version;
@@ -168,9 +188,12 @@ function compilePythonUtilities(isLegacyBuild = false, electronVersion = null) {
                 console.warn('\n⚠️  WARNING: Windows 7 Compatibility Issue ⚠️');
                 console.warn('You are building with Python ' + pythonVersion);
                 console.warn('Official Python versions 3.9 and above do not support Windows 7.');
+                console.warn('Also esptool dropped Python <3.10 support since commit d40fefa275dc4da28fdc747d2909a9ec29687ae8')
                 console.warn('\nTo maintain Windows 7 compatibility, you need to:');
                 console.warn('1. Install Python 3.8 (last version with Windows 7 support)');
-                console.warn('2. Manually compile and replace the Python utilities using:');
+                console.warn('2. Downgrade esptool to commit d40fefa275dc4da28fdc747d2909a9ec29687ae8');
+                console.warn('To do this, run the update-esptool command with --support-below-3.10');
+                console.warn('3. Manually compile and replace the Python utilities using:');
                 console.warn('\n   Python utilities to compile separately:');
                 PYTHON_UTILITIES.forEach(util => {
                     console.warn(`   - ${util.script} → ${util.output}`);
@@ -506,8 +529,9 @@ async function setupLegacyElectron(version) {
         console.log(`Using ${useTimeSync ? 'synced' : 'exact'} timestamp: ${timestampVersion}`);
         fs.writeFileSync(tempAppVersionPath, timestampVersion);
 
-        // Compile and copy NVS tool to temp directory for macOS
+        // Compile and copy NVS tool to temp directory for macOS and also downgrade esptool due to breaking change on Python <3.10 support
         if (process.platform === 'darwin') {
+            HandleEsptoolDowngades();
             console.log('Compiling ESP NVS tool with PyInstaller...');
             runCommand(PYINSTALLER_CMD);
             if (fs.existsSync(PYINSTALLER_BINARY)) {

@@ -37,7 +37,13 @@ yarn test
 yarn rebuild-native-modules-arm
 ```
 
-4. Compile the additional dependencies and package the app (untested on Mac OS platforms, so make an issue if there is a problem)
+4. (Only on systems running Python <3.10) Downgrade esptool before it dropped Python <3.10 support:
+```bash
+# This is already done in Mac OS builds since these have a consistent out of date built in version of Python
+yarn update-esptool --support-below-py3.10
+```
+
+5. Compile the additional dependencies and package the app
 ```bash
 yarn package
 ```

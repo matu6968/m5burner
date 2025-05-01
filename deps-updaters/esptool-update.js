@@ -6,6 +6,8 @@ const { execSync } = require('child_process');
 const TEMP_DIR = path.resolve('.temp-esptool');
 const ESPTOOL_REPO = 'https://github.com/espressif/esptool.git';
 const ESPTOOL_DEST = path.resolve('../deps/tool');
+// check if esptool should support Python <3.10
+const supportPythonBelow310 = process.argv.includes('--support-below-py3.10');
 
 // Helper function to clean up directories
 function cleanDirectory(dir) {
@@ -40,7 +42,8 @@ function getEsptoolVersion(dir) {
 
 // Main update function
 async function updateEsptool() {
-    console.log('Starting esptool update process...');
+        
+    console.log(`Starting esptool ${supportPythonBelow310 ? 'downgrading' : 'upgrading'} process...`);
 
     // Clean up any existing temporary directory
     cleanDirectory(TEMP_DIR);
@@ -53,12 +56,17 @@ async function updateEsptool() {
         console.log('Cloning esptool repository...');
         execSync(`git clone ${ESPTOOL_REPO} ${TEMP_DIR}`, { stdio: 'inherit' });
 
+        // Downgrade to commit where it still supported Python <3.10
+        if (process.argv.includes('--support-below-py3.10')) {
+            console.log("Checking out commit 26e86e92367d3cc20a370b578a998aec4cbdfd65 (last version to support Python <3.10)")
+            execSync(`cd ${TEMP_DIR} && git checkout 26e86e92367d3cc20a370b578a998aec4cbdfd65`)
+        }
         // Get commit hash before copying
         const commitHash = getGitCommitHash(TEMP_DIR);
         const version = getEsptoolVersion(TEMP_DIR);
 
         // Copy esptool.py
-        console.log('Updating esptool.py...');
+        console.log(`${supportPythonBelow310 ? 'Downgrading' : 'Upgrading'} esptool.py...`);
         fs.copyFileSync(
             path.join(TEMP_DIR, 'esptool.py'),
             path.join(ESPTOOL_DEST, 'esptool.py')
@@ -76,16 +84,16 @@ async function updateEsptool() {
         );
 
         // Print update information
-        console.log('\nesptool update completed successfully! 🎉');
+        console.log(`\nesptool ${supportPythonBelow310 ? 'downgrade' : 'update'} completed successfully! 🎉`);
         if (version) {
-            console.log(`Updated to version: ${version}`);
+            console.log(`${supportPythonBelow310 ? 'Downgraded' : 'Updated'} to version: ${version}`);
         }
         if (commitHash) {
             console.log(`Git commit: ${commitHash}`);
         }
 
     } catch (error) {
-        console.error('Failed to update esptool:', error);
+        console.error(`Failed to ${supportPythonBelow310 ? 'downgrade' : 'update'} esptool:`, error);
         process.exit(1);
     } finally {
         // Clean up temporary directory
@@ -95,6 +103,6 @@ async function updateEsptool() {
 
 // Run the update
 updateEsptool().catch(error => {
-    console.error('Update process failed:', error);
+    console.error(`${supportPythonBelow310 ? 'Downgrade' : 'Update'} process failed:`, error);
     process.exit(1);
 });
