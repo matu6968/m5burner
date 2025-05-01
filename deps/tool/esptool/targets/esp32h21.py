@@ -65,13 +65,13 @@ class ESP32H21ROM(ESP32H2ROM):
     def get_chip_description(self):
         chip_name = {
             0: "ESP32-H21",
-        }.get(self.get_pkg_version(), "unknown ESP32-H21")
+        }.get(self.get_pkg_version(), "Unknown ESP32-H21")
         major_rev = self.get_major_chip_version()
         minor_rev = self.get_minor_chip_version()
         return f"{chip_name} (revision v{major_rev}.{minor_rev})"
 
     def get_chip_features(self):
-        return ["BLE", "IEEE802.15.4"]
+        return ["BT 5 (LE)", "IEEE802.15.4", "Single Core", "96MHz"]
 
     def get_crystal_freq(self):
         # ESP32H21 XTAL is fixed to 32MHz

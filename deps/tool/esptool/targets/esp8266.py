@@ -4,14 +4,13 @@
 # SPDX-License-Identifier: GPL-2.0-or-later
 
 from ..loader import ESPLoader, StubMixin
-from ..util import FatalError, NotSupportedError
+from ..util import FatalError
 
 
 class ESP8266ROM(ESPLoader):
     """Access class for ESP8266 ROM bootloader"""
 
     CHIP_NAME = "ESP8266"
-    IS_STUB = False
 
     MAGIC_VALUE = 0xFFF0C101
 
@@ -107,7 +106,7 @@ class ESP8266ROM(ESPLoader):
         return "ESP8266EX"
 
     def get_chip_features(self):
-        features = ["WiFi"]
+        features = ["Wi-Fi", "160MHz"]
         if "ESP8285" in self.get_chip_description():
             features += ["Embedded Flash"]
         return features
@@ -168,18 +167,6 @@ class ESP8266ROM(ESPLoader):
             return (num_sectors + 1) // 2 * sector_size
         else:
             return (num_sectors - head_sectors) * sector_size
-
-    def get_flash_voltage(self):
-        pass  # not supported on ESP8266
-
-    def override_vddsdio(self, new_voltage):
-        raise NotSupportedError(self, "Overriding VDDSDIO")
-
-    def check_spi_connection(self, spi_connection):
-        raise NotSupportedError(self, "Setting --spi-connection")
-
-    def get_secure_boot_enabled(self):
-        return False  # ESP8266 doesn't have security features
 
 
 class ESP8266StubLoader(StubMixin, ESP8266ROM):

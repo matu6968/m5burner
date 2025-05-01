@@ -3,8 +3,6 @@
 #
 # SPDX-License-Identifier: GPL-2.0-or-later
 
-from typing import Dict
-
 from .esp32c6 import ESP32C6ROM
 from ..loader import ESPLoader, StubMixin
 from ..logger import log
@@ -37,8 +35,7 @@ class ESP32H2ROM(ESP32C6ROM):
 
     UF2_FAMILY_ID = 0x332726F6
 
-    EFUSE_MAX_KEY = 5
-    KEY_PURPOSES: Dict[int, str] = {
+    KEY_PURPOSES: dict[int, str] = {
         0: "USER/EMPTY",
         1: "ECDSA_KEY",
         2: "XTS_AES_256_KEY_1",
@@ -68,13 +65,13 @@ class ESP32H2ROM(ESP32C6ROM):
     def get_chip_description(self):
         chip_name = {
             0: "ESP32-H2",
-        }.get(self.get_pkg_version(), "unknown ESP32-H2")
+        }.get(self.get_pkg_version(), "Unknown ESP32-H2")
         major_rev = self.get_major_chip_version()
         minor_rev = self.get_minor_chip_version()
         return f"{chip_name} (revision v{major_rev}.{minor_rev})"
 
     def get_chip_features(self):
-        return ["BLE", "IEEE802.15.4"]
+        return ["BT 5 (LE)", "IEEE802.15.4", "Single Core", "96MHz"]
 
     def get_crystal_freq(self):
         # ESP32H2 XTAL is fixed to 32MHz

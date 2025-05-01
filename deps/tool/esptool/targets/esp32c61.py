@@ -4,7 +4,6 @@
 # SPDX-License-Identifier: GPL-2.0-or-later
 
 import struct
-from typing import Dict
 
 from .esp32c3 import ESP32C3ROM
 from .esp32c6 import ESP32C6ROM
@@ -67,8 +66,7 @@ class ESP32C61ROM(ESP32C6ROM):
 
     UF2_FAMILY_ID = 0x77D850C4
 
-    EFUSE_MAX_KEY = 5
-    KEY_PURPOSES: Dict[int, str] = {
+    KEY_PURPOSES: dict[int, str] = {
         0: "USER/EMPTY",
         1: "ECDSA_KEY",
         2: "XTS_AES_256_KEY_1",
@@ -102,13 +100,13 @@ class ESP32C61ROM(ESP32C6ROM):
     def get_chip_description(self):
         chip_name = {
             0: "ESP32-C61",
-        }.get(self.get_pkg_version(), "unknown ESP32-C61")
+        }.get(self.get_pkg_version(), "Unknown ESP32-C61")
         major_rev = self.get_major_chip_version()
         minor_rev = self.get_minor_chip_version()
         return f"{chip_name} (revision v{major_rev}.{minor_rev})"
 
     def get_chip_features(self):
-        return ["WiFi 6", "BT 5"]
+        return ["Wi-Fi 6", "BT 5 (LE)", "Single Core", "160MHz"]
 
     def read_mac(self, mac_type="BASE_MAC"):
         """Read MAC from EFUSE region"""

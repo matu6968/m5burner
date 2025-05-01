@@ -5,12 +5,11 @@
 
 import struct
 from time import sleep
-from typing import Dict
 
 from .esp32 import ESP32ROM
 from ..loader import ESPLoader, StubMixin
 from ..logger import log
-from ..util import FatalError, NotImplementedInROMError
+from ..util import FatalError, NotSupportedError
 
 
 class ESP32S2ROM(ESP32ROM):
@@ -116,8 +115,7 @@ class ESP32S2ROM(ESP32ROM):
 
     UF2_FAMILY_ID = 0xBFDD4EEE
 
-    EFUSE_MAX_KEY = 5
-    KEY_PURPOSES: Dict[int, str] = {
+    KEY_PURPOSES: dict[int, str] = {
         0: "USER/EMPTY",
         1: "RESERVED",
         2: "XTS_AES_256_KEY_1",
@@ -175,17 +173,14 @@ class ESP32S2ROM(ESP32ROM):
             100: "ESP32-S2R2",
         }.get(
             self.get_flash_cap() + self.get_psram_cap() * 100,
-            "unknown ESP32-S2",
+            "Unknown ESP32-S2",
         )
         major_rev = self.get_major_chip_version()
         minor_rev = self.get_minor_chip_version()
         return f"{chip_name} (revision v{major_rev}.{minor_rev})"
 
     def get_chip_features(self):
-        features = ["WiFi"]
-
-        if self.secure_download_mode:
-            features += ["Secure Download Mode Enabled"]
+        features = ["Wi-Fi", "Single Core", "240MHz"]
 
         flash_version = {
             0: "No Embedded Flash",
@@ -203,9 +198,9 @@ class ESP32S2ROM(ESP32ROM):
 
         block2_version = {
             0: "No calibration in BLK2 of efuse",
-            1: "ADC and temperature sensor calibration in BLK2 of efuse V1",
-            2: "ADC and temperature sensor calibration in BLK2 of efuse V2",
-        }.get(self.get_block2_version(), "Unknown Calibration in BLK2")
+            1: "ADC and temperature sensor calibration in BLK2 of eFuse V1",
+            2: "ADC and temperature sensor calibration in BLK2 of eFuse V2",
+        }.get(self.get_block2_version(), "Unknown calibration in BLK2")
         features += [block2_version]
 
         return features
@@ -218,9 +213,7 @@ class ESP32S2ROM(ESP32ROM):
         return None  # not supported on ESP32-S2
 
     def override_vddsdio(self, new_voltage):
-        raise NotImplementedInROMError(
-            "VDD_SDIO overrides are not supported for ESP32-S2"
-        )
+        raise NotSupportedError(self, "Overriding VDDSDIO")
 
     def read_mac(self, mac_type="BASE_MAC"):
         """Read MAC from EFUSE region"""

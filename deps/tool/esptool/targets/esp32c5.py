@@ -5,7 +5,6 @@
 
 import struct
 import time
-from typing import Dict
 
 from .esp32c3 import ESP32C3ROM
 from .esp32c6 import ESP32C6ROM
@@ -17,6 +16,8 @@ from ..util import FatalError
 class ESP32C5ROM(ESP32C6ROM):
     CHIP_NAME = "ESP32-C5"
     IMAGE_CHIP_ID = 23
+
+    BOOTLOADER_FLASH_OFFSET = 0x2000
 
     EFUSE_BASE = 0x600B4800
     EFUSE_BLOCK1_ADDR = EFUSE_BASE + 0x044
@@ -79,8 +80,7 @@ class ESP32C5ROM(ESP32C6ROM):
 
     UF2_FAMILY_ID = 0xF71C0343
 
-    EFUSE_MAX_KEY = 5
-    KEY_PURPOSES: Dict[int, str] = {
+    KEY_PURPOSES: dict[int, str] = {
         0: "USER/EMPTY",
         1: "ECDSA_KEY",
         2: "XTS_AES_256_KEY_1",
@@ -111,10 +111,19 @@ class ESP32C5ROM(ESP32C6ROM):
     def get_chip_description(self):
         chip_name = {
             0: "ESP32-C5",
-        }.get(self.get_pkg_version(), "unknown ESP32-C5")
+        }.get(self.get_pkg_version(), "Unknown ESP32-C5")
         major_rev = self.get_major_chip_version()
         minor_rev = self.get_minor_chip_version()
         return f"{chip_name} (revision v{major_rev}.{minor_rev})"
+
+    def get_chip_features(self):
+        return [
+            "Wi-Fi 6 (dual-band)",
+            "BT 5 (LE)",
+            "IEEE802.15.4",
+            "Single Core + LP Core",
+            "240MHz",
+        ]
 
     def get_crystal_freq(self):
         # The crystal detection algorithm of ESP32/ESP8266
@@ -135,7 +144,7 @@ class ESP32C5ROM(ESP32C6ROM):
             crystal_freq_detect = self.get_crystal_freq()
             log.print(
                 f"ROM expects crystal freq: {crystal_freq_rom_expect} MHz, "
-                f"detected {crystal_freq_detect} MHz"
+                f"detected {crystal_freq_detect} MHz."
             )
             baud_rate = baud
             # If detect the XTAL is 48MHz, but the ROM code expects it to be 40MHz
@@ -148,8 +157,10 @@ class ESP32C5ROM(ESP32C6ROM):
                 ESPLoader.change_baud(self, baud_rate)
                 return
 
-            log.print(f"Changing baud rate to {baud_rate}")
-            self.command(self.ESP_CHANGE_BAUDRATE, struct.pack("<II", baud_rate, 0))
+            log.print(f"Changing baud rate to {baud_rate}...")
+            self.command(
+                self.ESP_CMDS["CHANGE_BAUDRATE"], struct.pack("<II", baud_rate, 0)
+            )
             log.print("Changed.")
             self._set_port_baudrate(baud)
             time.sleep(0.05)  # get rid of garbage sent during baud rate change

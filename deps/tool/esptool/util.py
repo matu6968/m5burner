@@ -2,10 +2,15 @@
 # Espressif Systems (Shanghai) CO LTD, other contributors as noted.
 #
 # SPDX-License-Identifier: GPL-2.0-or-later
-
+from __future__ import annotations
 import os
 import re
 import struct
+
+from typing import IO, TypeAlias
+
+# Define a custom type for the input
+ImageSource: TypeAlias = str | bytes | IO[bytes]
 
 
 def byte(bitstr, index):
@@ -30,7 +35,7 @@ def div_roundup(a, b):
 
 
 def flash_size_bytes(size):
-    """Given a flash size of the type passed in args.flash_size
+    """Given a flash size of the type passed in size
     (ie 512KB or 1MB) then return the size in bytes.
     """
     if size is None:
@@ -40,7 +45,7 @@ def flash_size_bytes(size):
     elif "KB" in size:
         return int(size[: size.index("KB")]) * 1024
     else:
-        raise FatalError("Unknown size %s" % size)
+        raise FatalError(f"Unknown size {size}")
 
 
 def hexify(s, uppercase=True):
@@ -48,7 +53,7 @@ def hexify(s, uppercase=True):
     return "".join(format_str % c for c in s)
 
 
-def pad_to(data, alignment, pad_character=b"\xFF"):
+def pad_to(data, alignment, pad_character=b"\xff"):
     """Pad to the next alignment boundary"""
     pad_mod = len(data) % alignment
     if pad_mod != 0:
@@ -79,6 +84,48 @@ def get_file_size(path_to_file):
         f.seek(0, os.SEEK_END)
         file_size = f.tell()
     return file_size
+
+
+def sanitize_string(byte_string):
+    return byte_string.decode("utf-8").replace("\0", "")
+
+
+def get_bytes(input: ImageSource) -> tuple[bytes, str | None]:
+    """
+    Normalize the input (file path, bytes, or an opened file-like object) into bytes
+    and provide a name of the source.
+
+    Args:
+        input: The input file path, bytes, or an opened file-like object.
+
+    Returns:
+        A tuple containing the normalized bytes and the source of the input.
+    """
+    if isinstance(input, str):
+        with open(input, "rb") as f:
+            data = f.read()
+            source = input
+    elif isinstance(input, bytes):
+        data = input
+        source = None
+    elif hasattr(input, "read") and hasattr(input, "write") and hasattr(input, "close"):
+        pos = input.tell()
+        data = input.read()
+        input.seek(pos)  # Reset the file pointer
+        source = input.name
+    else:
+        raise FatalError(f"Invalid input type {type(input)}")
+    return data, source
+
+
+def get_key_from_value(dict, val):
+    """
+    Get key from value in dictionary, assumes unique values in dictionary
+    """
+    for key, value in dict.items():
+        if value == val:
+            return key
+    return None
 
 
 class PrintOnce:
