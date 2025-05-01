@@ -29,6 +29,7 @@
     "test": "electron app.js",
     "create-update": "node scripts/create-update-package.js",
     "update-esptool": "node esptool-update.js",
+    "update-rich_click": "node rich_click-update.js",
     "rebuild-native-modules-arm": "cd node_modules/usb && node-gyp rebuild --target=36.0.1 --arch=arm --dist-url=https://electronjs.org/headers && cd ../serialport/node_modules/@serialport/bindings-cpp && node-gyp rebuild --target=36.0.1 --arch=arm --dist-url=https://electronjs.org/headers && cd ../../../../@serialport/bindings-cpp && node-gyp rebuild --target=36.0.1 --arch=arm --dist-url=https://electronjs.org/headers"
   },
   "build": {

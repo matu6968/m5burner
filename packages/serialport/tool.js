@@ -117,7 +117,7 @@ function erase(opts, send) {
   if(os.platform() === 'darwin' || os.platform() === 'linux') {
     comPrefix = '/dev/'
   }
-  let process = runBurnScript(os.platform(), opts.device, ['--port', comPrefix + opts.com, 'erase_flash'])
+  let process = runBurnScript(os.platform(), opts.device, ['--port', comPrefix + opts.com, 'erase-flash'])
   pid = process.pid
   process.stdout.on('data', chunk => {
     let msg = stripAnsiCodes(chunk.toString())
