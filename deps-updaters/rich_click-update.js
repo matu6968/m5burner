@@ -3,9 +3,9 @@ const path = require('path');
 const { execSync } = require('child_process');
 
 // Constants
-const TEMP_DIR = path.resolve('.temp-esptool');
-const ESPTOOL_REPO = 'https://github.com/espressif/esptool.git';
-const ESPTOOL_DEST = path.resolve('deps/tool');
+const TEMP_DIR = path.resolve('.temp-rich-click');
+const RICH_CLICK_REPO = 'https://github.com/ewels/rich-click.git';
+const RICH_CLICK_DEST = path.resolve('../deps/tool');
 
 // Helper function to clean up directories
 function cleanDirectory(dir) {
@@ -25,22 +25,22 @@ function getGitCommitHash(dir) {
     }
 }
 
-// Helper function to get esptool version
-function getEsptoolVersion(dir) {
-    const initPath = path.join(dir, 'esptool', '__init__.py');
+// Helper function to get rich_click version
+function getRichClickVersion(dir) {
+    const initPath = path.join(dir, 'src', 'rich_click', '__init__.py');
     try {
         const content = fs.readFileSync(initPath, 'utf8');
         const versionMatch = content.match(/__version__\s*=\s*['"]([^'"]+)['"]/);
         return versionMatch ? versionMatch[1] : null;
     } catch (error) {
-        console.error('Failed to read esptool version:', error);
+        console.error('Failed to read rich_click version:', error);
         return null;
     }
 }
 
 // Main update function
-async function updateEsptool() {
-    console.log('Starting esptool update process...');
+async function updateRichClick() {
+    console.log('Starting rich_click update process...');
 
     // Clean up any existing temporary directory
     cleanDirectory(TEMP_DIR);
@@ -49,34 +49,27 @@ async function updateEsptool() {
         // Create temporary directory
         fs.mkdirSync(TEMP_DIR, { recursive: true });
 
-        // Clone esptool repository
-        console.log('Cloning esptool repository...');
-        execSync(`git clone ${ESPTOOL_REPO} ${TEMP_DIR}`, { stdio: 'inherit' });
+        // Clone rich_click repository
+        console.log('Cloning rich_click repository...');
+        execSync(`git clone ${RICH_CLICK_REPO} ${TEMP_DIR}`, { stdio: 'inherit' });
 
         // Get commit hash before copying
         const commitHash = getGitCommitHash(TEMP_DIR);
-        const version = getEsptoolVersion(TEMP_DIR);
+        const version = getRichClickVersion(TEMP_DIR);
 
-        // Copy esptool.py
-        console.log('Updating esptool.py...');
-        fs.copyFileSync(
-            path.join(TEMP_DIR, 'esptool.py'),
-            path.join(ESPTOOL_DEST, 'esptool.py')
-        );
+        // Clean existing rich_click directory if it exists
+        cleanDirectory(path.join(RICH_CLICK_DEST, 'rich_click'));
 
-        // Clean existing esptool directory if it exists
-        cleanDirectory(path.join(ESPTOOL_DEST, 'esptool'));
-
-        // Copy esptool directory
-        console.log('Updating esptool package...');
+        // Copy rich_click directory
+        console.log('Updating rich_click package...');
         fs.cpSync(
-            path.join(TEMP_DIR, 'esptool'),
-            path.join(ESPTOOL_DEST, 'esptool'),
+            path.join(TEMP_DIR, 'src', 'rich_click'),
+            path.join(RICH_CLICK_DEST, 'rich_click'),
             { recursive: true }
         );
 
         // Print update information
-        console.log('\nesptool update completed successfully! 🎉');
+        console.log('\nrich_click update completed successfully! 🎉');
         if (version) {
             console.log(`Updated to version: ${version}`);
         }
@@ -85,7 +78,7 @@ async function updateEsptool() {
         }
 
     } catch (error) {
-        console.error('Failed to update esptool:', error);
+        console.error('Failed to update rich_click:', error);
         process.exit(1);
     } finally {
         // Clean up temporary directory
@@ -94,7 +87,7 @@ async function updateEsptool() {
 }
 
 // Run the update
-updateEsptool().catch(error => {
+updateRichClick().catch(error => {
     console.error('Update process failed:', error);
     process.exit(1);
 });
