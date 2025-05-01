@@ -4,6 +4,7 @@ esptool.py and esptool (in deps_package/tool): GPL-2.0 (license: https://github.
 nvs_partition_gen: Apache-2.0 (license: https://github.com/espressif/esp-idf-nvs-partition-gen/blob/main/LICENSE)
 intelhex (in deps_package/tool): BSD-3-Clause (license: https://github.com/python-intelhex/intelhex/blob/master/LICENSE.txt)
 serial: (in deps_package/tool): BSD-3-Clause (license: https://github.com/pyserial/pyserial/blob/master/LICENSE.txt)
+rich_click (in deps_package/tool): MIT (license: https://github.com/ewels/rich-click/blob/main/LICENSE)
 kflash.py (in deps_package/tool): MIT (license: https://github.com/kendryte/kflash.py/blob/master/LICENSE)
 
 The following files that are still proprietary to M5Stack but yet to be reverse engineered:

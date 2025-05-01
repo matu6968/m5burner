@@ -89,11 +89,11 @@ function generateBasicConfig(com, baudRate, device) {
     '--chip', 'auto',
     '--port', comPrefix + com,
     '--baud', baudRate,
-    '--before', 'default_reset',
-    'write_flash', '-z',
-    '--flash_mode', 'dio',
-    '--flash_freq', '80m',
-    '--flash_size', 'detect'
+    '--before', 'default-reset',
+    'write-flash', '-z',
+    '--flash-mode', 'dio',
+    '--flash-freq', '80m',
+    '--flash-size', 'detect'
   ]
 }
 

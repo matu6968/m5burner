@@ -9,6 +9,8 @@
 """\
 Support threading with serial ports.
 """
+from __future__ import absolute_import
+
 import serial
 import threading
 
@@ -138,7 +140,7 @@ class LineReader(Packetizer):
     def write_line(self, text):
         """
         Write text to the transport. ``text`` is a Unicode string and the encoding
-        is applied before sending ans also the newline is append.
+        is applied before sending and also the newline is append.
         """
         # + is not the best choice but bytes does not support % or .format in py3 and we want a single write call
         self.transport.write(text.encode(self.ENCODING, self.UNICODE_HANDLING) + self.TERMINATOR)
@@ -201,7 +203,7 @@ class ReaderThread(threading.Thread):
                 break
             else:
                 if data:
-                    # make a separated try-except for called used code
+                    # make a separated try-except for called user code
                     try:
                         self.protocol.data_received(data)
                     except Exception as e:
@@ -214,7 +216,7 @@ class ReaderThread(threading.Thread):
     def write(self, data):
         """Thread safe writing (uses lock)"""
         with self._lock:
-            self.serial.write(data)
+            return self.serial.write(data)
 
     def close(self):
         """Close the serial port and exit reader thread (uses lock)"""

@@ -12,13 +12,15 @@
 #
 # where <regexp> is a Python regexp according to the re module
 #
-# violating the normal definition for URLs, the charachter `&` is used to
+# violating the normal definition for URLs, the character `&` is used to
 # separate parameters from the arguments (instead of `?`, but the question mark
 # is heavily used in regexp'es)
 #
 # options:
 # n=<N>     pick the N'th entry instead of the first one (numbering starts at 1)
 # skip_busy tries to open port to check if it is busy, fails on posix as ports are not locked!
+
+from __future__ import absolute_import
 
 import serial
 import serial.tools.list_ports
