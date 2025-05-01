@@ -47,7 +47,7 @@ yarn package
 
 `--pi-apps` - builds a version of the app for Pi-Apps by building the launcher to use the install paths oriented for Pi-Apps (ideally use the `--new-release` flag when using this so that you have a new release for uploading on release page if you are a maintainer for updating the app on Pi-Apps)
 
-`--time-sync` - delays the time present on appVersion.info by the next 10 minute interval (for example, if the build started at 12:06, it will have file output it as 12:00)
+`--time-sync` - delays the time present on appVersion.info by the next hour interval (for example, if the build started at 12:27, it will have file output it as 12:00)
 
 `--legacy-release` specify a Electron version to use for the release for this build only by it's major version (for example, `--legacy-release 22` will use Electron 22.x.x, ideal for older systems that don't support the latest Electron version, though this will lack any security updates for Electron if the Electron version selected is EOL)
 

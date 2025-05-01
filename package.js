@@ -313,8 +313,8 @@ function generateTimestampVersion() {
 // Add this helper function after other helper functions
 function generateSyncedTimestampVersion() {
     const now = new Date();
-    // Round down to nearest 10 minute interval
-    const minutes = Math.floor(now.getMinutes() / 10) * 10;
+    // Round down to nearest 60 minute interval
+    const minutes = Math.floor(now.getMinutes() / 60) * 60;
     
     // Create a new date with rounded minutes
     const syncedDate = new Date(now);
