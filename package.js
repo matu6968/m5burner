@@ -38,7 +38,7 @@ const getPlatformConfig = () => {
 const platformConfig = getPlatformConfig();
 const BASE_FOLDER = platformConfig.outputDir;
 const ELECTRON_BUILD_CMD = platformConfig.electronBuildCmd;
-const DOWNGRADE_ESPTOOL = 'node deps-updaters/esptool-update.js --support-below-3.10'
+const DOWNGRADE_ESPTOOL = 'node deps-updaters/esptool-update.js --support-below-py3.10'
 const PYINSTALLER_CMD = 'pyinstaller --onefile esp-idf-nvs-partition-gen/esp_idf_nvs_partition_gen/nvs_partition_gen.py --distpath esp-idf-nvs-partition-gen/esp_idf_nvs_partition_gen/dist';
 const ELECTRON_OUTPUT = platformConfig.electronOutput;
 const BUILD_DIR = path.resolve('deps');
@@ -192,7 +192,7 @@ function compilePythonUtilities(isLegacyBuild = false, electronVersion = null) {
                 console.warn('\nTo maintain Windows 7 compatibility, you need to:');
                 console.warn('1. Install Python 3.8 (last version with Windows 7 support)');
                 console.warn('2. Downgrade esptool to commit d40fefa275dc4da28fdc747d2909a9ec29687ae8');
-                console.warn('To do this, run the update-esptool command with --support-below-3.10');
+                console.warn('To do this, run the update-esptool command with --support-below-py3.10');
                 console.warn('3. Manually compile and replace the Python utilities using:');
                 console.warn('\n   Python utilities to compile separately:');
                 PYTHON_UTILITIES.forEach(util => {
