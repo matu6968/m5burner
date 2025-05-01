@@ -6,7 +6,7 @@ intelhex (in deps_package/tool): BSD-3-Clause (license: https://github.com/pytho
 serial: (in deps_package/tool): BSD-3-Clause (license: https://github.com/pyserial/pyserial/blob/master/LICENSE.txt)
 rich_click (in deps_package/tool): MIT (license: https://github.com/ewels/rich-click/blob/main/LICENSE)
 rich (in deps_package/tool): MIT (license: https://github.com/Textualize/rich/blob/main/LICENSE)
-click (in deps_package/tool): BSD-3-Clause (license: https://github.com/pallets/click//blob/main/LICENSE)
+click (in deps_package/tool): BSD-3-Clause (license: https://github.com/pallets/click/blob/main/LICENSE.txt)
 kflash.py (in deps_package/tool): MIT (license: https://github.com/kendryte/kflash.py/blob/master/LICENSE)
 
 The following files that are still proprietary to M5Stack but yet to be reverse engineered:
