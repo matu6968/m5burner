@@ -5,3 +5,7 @@ nvs_partition_gen: Apache-2.0 (license: https://github.com/espressif/esp-idf-nvs
 intelhex (in deps_package/tool): BSD-3-Clause (license: https://github.com/python-intelhex/intelhex/blob/master/LICENSE.txt)
 serial: (in deps_package/tool): BSD-3-Clause (license: https://github.com/pyserial/pyserial/blob/master/LICENSE.txt)
 kflash.py (in deps_package/tool): MIT (license: https://github.com/kendryte/kflash.py/blob/master/LICENSE)
+
+The following files that are still proprietary to M5Stack but yet to be reverse engineered:
+deps/tool/esp32_board_identify.bin (M5Stack HW detection)
+all files in deps/view (main UI that displays when you launch M5Burner, is a Angular based app)
