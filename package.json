@@ -29,11 +29,7 @@
     "test": "electron app.js",
     "create-update": "node scripts/create-update-package.js",
     "update-esptool": "cd deps-updaters && node esptool-update.js",
-    "update-rich_click": "cd deps-updaters && node rich_click-update.js",
-    "update-rich": "cd deps-updaters && node rich-update.js",
-    "update-click": "cd deps-updaters && node click-update.js",
-    "update-all-deps": "cd deps-updaters && node esptool-update.js && node rich-update.js && node click-update.js && node rich_click-update.js",
-    "rebuild-native-modules-arm": "cd node_modules/usb && node-gyp rebuild --target=36.0.1 --arch=arm --dist-url=https://electronjs.org/headers && cd ../serialport/node_modules/@serialport/bindings-cpp && node-gyp rebuild --target=36.0.1 --arch=arm --dist-url=https://electronjs.org/headers && cd ../../../../@serialport/bindings-cpp && node-gyp rebuild --target=36.0.1 --arch=arm --dist-url=https://electronjs.org/headers"
+    "rebuild-native-modules-arm": "VER=36.1.0 cd node_modules/usb && node-gyp rebuild --target=$VER --arch=arm --dist-url=https://electronjs.org/headers && cd ../serialport/node_modules/@serialport/bindings-cpp && node-gyp rebuild --target=$VER --arch=arm --dist-url=https://electronjs.org/headers && cd ../../../../@serialport/bindings-cpp && node-gyp rebuild --target=$VER --arch=arm --dist-url=https://electronjs.org/headers"
   },
   "build": {
     "appId": "com.m5stack.m5burner",

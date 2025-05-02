@@ -58,8 +58,8 @@ async function updateEsptool() {
 
         // Downgrade to commit where it still supported Python <3.10
         if (process.argv.includes('--support-below-py3.10')) {
-            console.log("Checking out commit 19f1beeb24437929933dab8d75d520c107f45295 (last version to support Python <3.10)")
-            execSync(`cd ${TEMP_DIR} && git checkout 19f1beeb24437929933dab8d75d520c107f45295`)
+            console.log("Checking out commit c3d28ee9e08ddd9a01f0d126a477cd89565b3de3 (last version to support Python <3.10)")
+            execSync(`cd ${TEMP_DIR} && git checkout c3d28ee9e08ddd9a01f0d126a477cd89565b3de3`)
         }
         // Get commit hash before copying
         const commitHash = getGitCommitHash(TEMP_DIR);

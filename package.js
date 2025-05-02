@@ -147,8 +147,6 @@ function setupMacOSStructure() {
 // It is there due to a recent change that broke Python <3.10 support
 // and still modern Mac OS (tested only on Sonoma and Sequoia) has Python 3.9 by default
 // https://github.com/espressif/esptool/commit/19f1beeb24437929933dab8d75d520c107f45295
-// The above commit just removed support for installing on Python <3.10 but didn't break it running on older versions until the commit below:
-// https://github.com/espressif/esptool/commit/d40fefa275dc4da28fdc747d2909a9ec29687ae8
 function HandleEsptoolDowngrades() {
     if (process.platform !== 'darwin') return;
         const pythonVersion = getPythonVersion();
@@ -217,9 +215,9 @@ function compilePythonUtilities(isLegacyBuild = false, electronVersion = null) {
     // Install required dependencies first
     console.log('Installing required Python dependencies...');
     try {
-        execSync('pip install cryptography', { stdio: 'inherit' });
+        execSync('pip install cryptography rich_click', { stdio: 'inherit' });
     } catch (err) {
-        console.error('Failed to install cryptography dependency:', err);
+        console.error('Failed to install dependencies:', err);
         process.exit(1);
     }
     

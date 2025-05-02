@@ -16,7 +16,7 @@ git clone --recurse-submodules https://github.com/matu6968/m5burner.git
 # if you forgot to do so, run git submodule update --init after cloning
 cd m5burner
 yarn install
-pip install pyinstaller
+pip install pyinstaller rich_click
 # To install libnotify dependencies for Linux launcher to build depending on distro
 sudo apt install libnotify-dev # on Ubuntu/Debian systems
 sudo pacman -S libnotify # on Arch Linux systems
@@ -107,3 +107,11 @@ ESP32-S3/-C6 USB-CDC driver setup (guide to use with libusb): https://docs.espre
 
 ### macOS
 No additional setup required.
+
+## esptool dependencies:
+Due to commit https://github.com/espressif/esptool/commit/d40fefa275dc4da28fdc747d2909a9ec29687ae8 on esptool, `rich_click` is now a required dependency when using esptool. 
+To not add any further dependencies to the `deps` folder, this will require the user to install it.
+For Mac OS or Windows users running a prebuilt package, this does not apply otherwaise install it via pip:
+```bash
+pip install rich_click
+```
