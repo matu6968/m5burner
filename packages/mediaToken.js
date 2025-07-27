@@ -21,18 +21,26 @@ function getMac(com) {
       process = childProcess.spawn(global.pythonExec, [ESPTOOL_PY, '--port', comName, 'read_mac'])
     }
 
+    // Function to strip ANSI escape codes
+    function stripAnsi(str) {
+      return str.replace(/\x1B\[[0-9;]*[mGKHF]/g, '');
+    }
+
     let data = ''
     process.stdout.on('data', chunk => {
       data += chunk.toString()
     })
     process.stdout.on('close', () => {
-      let result = data.match(/MAC: ([A-Fa-f0-9:]+)/g)
+      // Strip ANSI codes before matching
+      let cleanData = stripAnsi(data)
+      // More robust regex: allow extra spaces, case-insensitive
+      let result = cleanData.match(/MAC:\s*([A-Fa-f0-9:]{17})/i)
       if(result === null) {
         resolve('')
         return
       }
-      if(result.length > 0) {
-        let macAddr = result[0].replace(/MAC: /g, '')
+      if(result.length > 1) {
+        let macAddr = result[1].trim()
         resolve(macAddr)
         return
       }

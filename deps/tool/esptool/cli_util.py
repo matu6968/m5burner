@@ -9,7 +9,7 @@ from esptool.bin_image import ESPLoader, intel_hex_to_bin
 from esptool.cmds import detect_flash_size
 from esptool.util import FatalError, flash_size_bytes, strip_chip_name
 from esptool.logger import log
-from typing import Any
+from typing import IO, Any
 
 ################################ Custom types #################################
 
@@ -140,12 +140,12 @@ class AutoHex2BinType(click.Path):
 
     def convert(
         self, value: str, param: click.Parameter | None, ctx: click.Context
-    ) -> str:
+    ) -> list[tuple[int | None, IO[bytes]]]:
         try:
             with open(value, "rb") as f:
                 # if hex file was detected replace hex file with converted temp bin
                 # otherwise keep the original file
-                return intel_hex_to_bin(f).name
+                return intel_hex_to_bin(f)
         except IOError as e:
             raise click.BadParameter(str(e))
 
@@ -171,7 +171,7 @@ class AddrFilenamePairType(click.Path):
         if len(value) == 0:
             return value
 
-        pairs = []
+        pairs: list[tuple[int, IO[bytes]]] = []
         for i in range(0, len(value), 2):
             try:
                 address = arg_auto_int(value[i])
@@ -186,8 +186,8 @@ class AddrFilenamePairType(click.Path):
             except IOError as e:
                 raise click.BadParameter(str(e))
             # check for intel hex files and convert them to bin
-            argfile = intel_hex_to_bin(argfile_f, address)
-            pairs.append((address, argfile))
+            argfile_list = intel_hex_to_bin(argfile_f, address)
+            pairs.extend(argfile_list)  # type: ignore
 
         # Sort the addresses and check for overlapping
         end = 0
@@ -265,9 +265,11 @@ class Group(click.RichGroup):
 
     def resolve_command(
         self, ctx: click.Context, args: list[str]
-    ) -> tuple[str, click.Command, list[str]]:
+    ) -> tuple[str | None, click.Command | None, list[str]]:
         # always return the full command name
         _, cmd, args = super().resolve_command(ctx, args)
+        if cmd is None:
+            return None, None, args
         return cmd.name, cmd, args
 
 
@@ -298,7 +300,7 @@ class OptionEatAll(click.Option):
         def parser_process(value, state):
             # Method to hook into the parser.process
             done = False
-            value = [value]
+            values = [value]
             # Grab everything up to the next option/command
             while state.rargs and not done:
                 for prefix in self._eat_all_parser.prefixes:
@@ -308,10 +310,16 @@ class OptionEatAll(click.Option):
                 if state.rargs[0] in self._commands_list:
                     done = True
                 if not done:
-                    value.append(state.rargs.pop(0))
+                    values.append(state.rargs.pop(0))
 
             # Call the original parser process method on the rest of the arguments
-            self._previous_parser_process(value, state)
+            if self.multiple:
+                # If multiple options can be used, Click does not support extending the
+                # value; as the 'value' is list, we need to process each item separately
+                for v in values:
+                    self._previous_parser_process(v, state)
+            else:
+                self._previous_parser_process(values, state)
 
         retval = super(OptionEatAll, self).add_to_parser(parser, ctx)
         for name in self.opts:
@@ -377,7 +385,7 @@ def arg_auto_int(x: str) -> int:
 
 
 def parse_port_filters(
-    value: list[str],
+    value: tuple[str],
 ) -> tuple[list[int], list[int], list[str], list[str]]:
     """Parse port filter arguments into separate lists for each filter type"""
     filterVids = []
@@ -387,7 +395,7 @@ def parse_port_filters(
     for f in value:
         kvp = f.split("=")
         if len(kvp) != 2:
-            FatalError("Option --port-filter argument must consist of key=value.")
+            raise FatalError("Option --port-filter argument must consist of key=value.")
         if kvp[0] == "vid":
             filterVids.append(arg_auto_int(kvp[1]))
         elif kvp[0] == "pid":

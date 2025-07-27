@@ -41,9 +41,46 @@ def align_file_position(f, size):
     f.seek(align, 1)
 
 
-def intel_hex_to_bin(file: IO[bytes], start_addr: int | None = None) -> IO[bytes]:
-    """Convert IntelHex file to temp binary file with padding from start_addr
-    If hex file was detected return temp bin file object; input file otherwise"""
+def _find_subsequences(addresses: list[int]) -> list[tuple[int, int]]:
+    """Find continuous subsequences in a list of addresses"""
+    if not addresses:
+        return []
+
+    sorted_seq = sorted(addresses)
+
+    subsequences = []
+    start = sorted_seq[0]
+
+    for prev, num in zip(sorted_seq, sorted_seq[1:]):
+        if num != prev + 1:
+            # Found a gap, save the current subsequence
+            subsequences.append((start, prev))
+            start = num
+
+    # Add the last subsequence
+    subsequences.append((start, sorted_seq[-1]))
+
+    return subsequences
+
+
+def _split_intel_hex_file(ih: IntelHex) -> list[tuple[int, IO[bytes]]]:
+    """Split an IntelHex file into multiple temporary binary files based on the gaps
+    in the addresses"""
+    subsequences = _find_subsequences(ih.addresses())
+    bins: list[tuple[int, IO[bytes]]] = []
+    for start, end in subsequences:
+        bin = tempfile.NamedTemporaryFile(suffix=".bin", delete=False)
+        ih.tobinfile(bin, start=start, end=end)
+        bin.seek(0)  # make sure the file is at the beginning
+        bins.append((start, bin))
+    return bins
+
+
+def intel_hex_to_bin(
+    file: IO[bytes], start_addr: int | None = None
+) -> list[tuple[int | None, IO[bytes]]]:
+    """Convert IntelHex file to list of temp binary files
+    If not hex file return input file otherwise"""
     INTEL_HEX_MAGIC = b":"
     magic = file.read(1)
     file.seek(0)
@@ -52,14 +89,12 @@ def intel_hex_to_bin(file: IO[bytes], start_addr: int | None = None) -> IO[bytes
             ih = IntelHex()
             ih.loadhex(file.name)
             file.close()
-            bin = tempfile.NamedTemporaryFile(suffix=".bin", delete=False)
-            ih.tobinfile(bin, start=start_addr)
-            return bin
+            return _split_intel_hex_file(ih)  # type: ignore
         else:
-            return file
+            return [(start_addr, file)]
     except (HexRecordError, UnicodeDecodeError):
         # file started with HEX magic but the rest was not according to the standard
-        return file
+        return [(start_addr, file)]
 
 
 def LoadFirmwareImage(chip: str, image_data: ImageSource):
@@ -105,10 +140,12 @@ class ImageSegment(object):
     """Wrapper class for a segment in an ESP image
     (very similar to a section in an ELFImage also)"""
 
-    def __init__(self, addr, data, file_offs=None):
+    def __init__(self, addr, data, file_offs=None, flags=0, align=4):
         self.addr = addr
         self.data = data
         self.file_offs = file_offs
+        self.flags = flags
+        self.align = align
         self.include_in_checksum = True
         if self.addr != 0:
             self.pad_to_alignment(
@@ -152,13 +189,33 @@ class ImageSegment(object):
     def pad_to_alignment(self, alignment):
         self.data = pad_to(self.data, alignment, b"\x00")
 
+    def end_addr_if_aligned(self, alignment):
+        """
+        Return the segment end address as it would be if
+        aligned as requested by the argument.
+        """
+        end_addr = self.addr + len(self.data)
+        addr_mod = end_addr % alignment
+        if addr_mod != 0:
+            end_addr += alignment - addr_mod
+        return end_addr
+
+    def pad_until_addr(self, addr):
+        """
+        Pad the segment with `0x00` starting with segment address
+        until the address given by the argument.
+        """
+        pad = addr - (self.addr + len(self.data))
+        if pad > 0:
+            self.data += b"\x00" * pad
+
 
 class ELFSection(ImageSegment):
     """Wrapper class for a section in an ELF image, has a section
     name as well as the common properties of an ImageSegment."""
 
-    def __init__(self, name, addr, data):
-        super(ELFSection, self).__init__(addr, data)
+    def __init__(self, name, addr, data, flags, align=4):
+        super(ELFSection, self).__init__(addr, data, flags=flags, align=align)
         self.name = name.decode("utf-8")
 
     def __repr__(self):
@@ -374,6 +431,26 @@ class BaseFirmwareImage(object):
             # merged in
             elem = self.segments[i - 1]
             next_elem = self.segments[i]
+
+            # When creating the images from 3rd-party frameworks ELFs, the merging
+            # could bring together segments with incompatible alignment requirements.
+            # At this point, we add padding so the resulting placement respects the
+            # original alignment requirements of those segments.
+            if self.ROM_LOADER != ESP8266ROM and self.ram_only_header:
+                elem_pad_addr = elem.end_addr_if_aligned(next_elem.align)
+
+                if (
+                    elem_pad_addr != elem.addr + len(elem.data)
+                    and elem_pad_addr == next_elem.addr
+                ):
+                    log.note(
+                        "Inserting {} bytes padding between {} and {}".format(
+                            next_elem.addr - (elem.addr + len(elem.data)),
+                            elem.name,
+                            next_elem.name,
+                        )
+                    )
+                    elem.pad_until_addr(elem_pad_addr)
             if all(
                 (
                     elem.get_memory_type(self) == next_elem.get_memory_type(self),
@@ -633,7 +710,7 @@ class ESP32FirmwareImage(BaseFirmwareImage):
     can be placed in the normal image (just @ MMU page size padded offsets).
     """
 
-    ROM_LOADER = ESP32ROM
+    ROM_LOADER: type[ESPLoader] = ESP32ROM
 
     # ROM bootloader will read the wp_pin field if SPI flash
     # pins are remapped via flash. IDF actually enables QIO only
@@ -797,10 +874,7 @@ class ESP32FirmwareImage(BaseFirmwareImage):
                     # Some chips have a non-zero load offset (eg. 0x1000)
                     # therefore we shift the ROM segments "-load_offset"
                     # so it will be aligned properly after it is flashed
-                    align_min = (
-                        self.ROM_LOADER.BOOTLOADER_FLASH_OFFSET - self.SEG_HEADER_LEN
-                    )
-                    if pad_len < align_min:
+                    if pad_len < self.ROM_LOADER.BOOTLOADER_FLASH_OFFSET:
                         # in case pad_len does not fit minimum alignment,
                         # pad it to next aligned boundary
                         pad_len += self.IROM_ALIGN
@@ -1090,7 +1164,7 @@ class ESP8266V3FirmwareImage(ESP32FirmwareImage):
         if any(f for f in fields[4:15] if f != 0):
             log.warning(
                 "Some reserved header fields have non-zero values. "
-                "This image may be from a newer esptool.py?"
+                "This image may be from a newer esptool?"
             )
 
 
@@ -1137,7 +1211,7 @@ ESP32C2ROM.BOOTLOADER_IMAGE = ESP32C2FirmwareImage
 class ESP32C6FirmwareImage(ESP32FirmwareImage):
     """ESP32C6 Firmware Image almost exactly the same as ESP32FirmwareImage"""
 
-    ROM_LOADER = ESP32C6ROM
+    ROM_LOADER: type[ESPLoader] = ESP32C6ROM
     MMU_PAGE_SIZE_CONF = (8192, 16384, 32768, 65536)
 
 
@@ -1162,18 +1236,10 @@ class ESP32C5FirmwareImage(ESP32FirmwareImage):
 ESP32C5ROM.BOOTLOADER_IMAGE = ESP32C5FirmwareImage
 
 
-class ESP32H4FirmwareImage(ESP32FirmwareImage):
-    """ESP32H4 Firmware Image almost exactly the same as ESP32FirmwareImage"""
+class ESP32H4FirmwareImage(ESP32C6FirmwareImage):
+    """ESP32H4 Firmware Image almost exactly the same as ESP32C6FirmwareImage"""
 
     ROM_LOADER = ESP32H4ROM
-
-    def set_mmu_page_size(self, size):
-        if size not in [8192, 16384, 32768, 65536]:
-            raise FatalError(
-                "{} bytes is not a valid ESP32-H4 page size, "
-                "select from 64KB, 32KB, 16KB, 8KB.".format(size)
-            )
-        self.IROM_ALIGN = size
 
 
 ESP32H4ROM.BOOTLOADER_IMAGE = ESP32H4FirmwareImage
@@ -1207,14 +1273,6 @@ ESP32H21ROM.BOOTLOADER_IMAGE = ESP32H21FirmwareImage
 
 
 class ELFFile(object):
-    SEC_TYPE_PROGBITS = 0x01
-    SEC_TYPE_STRTAB = 0x03
-    SEC_TYPE_NOBITS = 0x08  # e.g. .bss section
-    SEC_TYPE_INITARRAY = 0x0E
-    SEC_TYPE_FINIARRAY = 0x0F
-
-    PROG_SEC_TYPES = (SEC_TYPE_PROGBITS, SEC_TYPE_INITARRAY, SEC_TYPE_FINIARRAY)
-
     LEN_SEC_HEADER = 0x28
 
     SEG_TYPE_LOAD = 0x01
@@ -1273,6 +1331,22 @@ class ELFFile(object):
         self._read_segments(f, _phoff, _phnum, shstrndx)
 
     def _read_sections(self, f, section_header_offs, section_header_count, shstrndx):
+        SEC_TYPE_PROGBITS = 0x01
+        SEC_TYPE_STRTAB = 0x03
+        SEC_TYPE_NOBITS = 0x08  # e.g. .bss section
+        SEC_TYPE_INITARRAY = 0x0E
+        SEC_TYPE_FINIARRAY = 0x0F
+        SEC_TYPE_PREINITARRAY = 0x10
+
+        PROG_SEC_TYPES = (
+            SEC_TYPE_PROGBITS,
+            SEC_TYPE_INITARRAY,
+            SEC_TYPE_FINIARRAY,
+            SEC_TYPE_PREINITARRAY,
+        )
+
+        KNOWN_SEC_TYPES = PROG_SEC_TYPES + (SEC_TYPE_NOBITS, SEC_TYPE_STRTAB)
+
         f.seek(section_header_offs)
         len_bytes = section_header_count * self.LEN_SEC_HEADER
         section_header = f.read(len_bytes)
@@ -1291,22 +1365,26 @@ class ELFFile(object):
         section_header_offsets = range(0, len(section_header), self.LEN_SEC_HEADER)
 
         def read_section_header(offs):
-            name_offs, sec_type, _flags, lma, sec_offs, size = struct.unpack_from(
-                "<LLLLLL", section_header[offs:]
-            )
-            return (name_offs, sec_type, lma, size, sec_offs)
-
-        all_sections = [read_section_header(offs) for offs in section_header_offsets]
-        prog_sections = [s for s in all_sections if s[1] in ELFFile.PROG_SEC_TYPES]
-        nobits_secitons = [s for s in all_sections if s[1] == ELFFile.SEC_TYPE_NOBITS]
+            (
+                name_offs,
+                sec_type,
+                _flags,
+                lma,
+                sec_offs,
+                size,
+                _,
+                _,
+                align,
+            ) = struct.unpack_from("<LLLLLLLLL", section_header[offs:])
+            return (name_offs, sec_type, lma, size, sec_offs, _flags, align)
 
         # search for the string table section
         if (shstrndx * self.LEN_SEC_HEADER) not in section_header_offsets:
             raise FatalError(f"ELF file has no STRTAB section at shstrndx {shstrndx}")
-        _, sec_type, _, sec_size, sec_offs = read_section_header(
+        _, sec_type, _, sec_size, sec_offs, _flags, align = read_section_header(
             shstrndx * self.LEN_SEC_HEADER
         )
-        if sec_type != ELFFile.SEC_TYPE_STRTAB:
+        if sec_type != SEC_TYPE_STRTAB:
             log.warning(f"ELF file has incorrect STRTAB section type {sec_type:#04x}")
         f.seek(sec_offs)
         string_table = f.read(sec_size)
@@ -1322,17 +1400,42 @@ class ELFFile(object):
             f.seek(offs)
             return f.read(size)
 
-        prog_sections = [
-            ELFSection(lookup_string(n_offs), lma, read_data(offs, size))
-            for (n_offs, _type, lma, size, offs) in prog_sections
-            if lma != 0 and size > 0
-        ]
-        self.sections = prog_sections
-        self.nobits_sections = [
-            ELFSection(lookup_string(n_offs), lma, b"")
-            for (n_offs, _type, lma, size, offs) in nobits_secitons
-            if lma != 0 and size > 0
-        ]
+        all_sections = [read_section_header(offs) for offs in section_header_offsets]
+
+        self.sections = []
+        self.nobits_sections = []
+        # Process all sections and raise an error if an unknown section type is found
+        for section in all_sections:
+            n_offs, sec_type, lma, size, offs, _flags, align = section
+
+            # Skip sections with lma == 0 or size == 0
+            if lma == 0 or size == 0:
+                continue
+
+            if sec_type not in KNOWN_SEC_TYPES:
+                log.warning(f"Unknown section type {sec_type:#04x} in ELF file")
+                continue
+
+            if sec_type in PROG_SEC_TYPES:
+                self.sections.append(
+                    ELFSection(
+                        lookup_string(n_offs),
+                        lma,
+                        read_data(offs, size),
+                        flags=_flags,
+                        align=align,
+                    )
+                )
+            elif sec_type == SEC_TYPE_NOBITS:
+                self.nobits_sections.append(
+                    ELFSection(
+                        lookup_string(n_offs),
+                        lma,
+                        b"",
+                        flags=_flags,
+                        align=align,
+                    )
+                )
 
     def _read_segments(self, f, segment_header_offs, segment_header_count, shstrndx):
         f.seek(segment_header_offs)
@@ -1363,7 +1466,7 @@ class ELFFile(object):
                 _flags,
                 _align,
             ) = struct.unpack_from("<LLLLLLLL", segment_header[offs:])
-            return (seg_type, lma, size, seg_offs)
+            return (seg_type, lma, size, seg_offs, _flags, _align)
 
         all_segments = [read_segment_header(offs) for offs in segment_header_offsets]
         prog_segments = [s for s in all_segments if s[0] == ELFFile.SEG_TYPE_LOAD]
@@ -1373,8 +1476,8 @@ class ELFFile(object):
             return f.read(size)
 
         prog_segments = [
-            ELFSection(b"PHDR", lma, read_data(offs, size))
-            for (_type, lma, size, offs) in prog_segments
+            ELFSection(b"PHDR", lma, read_data(offs, size), flags=_flags, align=_align)
+            for (_type, lma, size, offs, _flags, _align) in prog_segments
             if lma != 0 and size > 0
         ]
         self.segments = prog_segments

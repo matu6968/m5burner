@@ -50,6 +50,20 @@ from .util import (
     sanitize_string,
 )
 
+
+# Vendors with different detection logic
+ADESTO_VENDOR_ID = 0x1F
+XMC_VENDOR_ID = 0x20
+
+DETECTED_FLASH_SIZES_ADESTO = {
+    0x04: "512KB",
+    0x05: "1MB",
+    0x06: "2MB",
+    0x07: "4MB",
+    0x08: "8MB",
+    0x09: "16MB",
+}
+
 DETECTED_FLASH_SIZES = {
     0x12: "256KB",
     0x13: "512KB",
@@ -136,31 +150,31 @@ def detect_chip(
                 continue
             if chip_id == cls.IMAGE_CHIP_ID:
                 inst = cls(detect_port._port, baud, trace_enabled=trace_enabled)
-                try:
-                    inst.read_reg(
-                        ESPLoader.CHIP_DETECT_MAGIC_REG_ADDR
-                    )  # Dummy read to check Secure Download mode
-                except UnsupportedCommandError:
-                    inst.secure_download_mode = True
+                si = inst.get_security_info()
+                inst.secure_download_mode = si["parsed_flags"]["SECURE_DOWNLOAD_ENABLE"]
                 inst = check_if_stub(inst)
                 inst._post_connect()
                 break
         else:
             err_msg = f"Unexpected chip ID value {chip_id}."
-    except (UnsupportedCommandError, struct.error, FatalError):
+    except (UnsupportedCommandError, FatalError):
         # UnsupportedCommandError: ESP8266/ESP32 ROM
-        # struct.error: ESP32-S2
-        # FatalError: ESP8266/ESP32 STUB
+        # FatalError: ESP8266/ESP32 STUB or ESP32-S2
         try:
             chip_magic_value = detect_port.read_reg(
                 ESPLoader.CHIP_DETECT_MAGIC_REG_ADDR
             )
         except UnsupportedCommandError:
-            raise FatalError(
-                "Unsupported Command Error received. "
-                "Probably this means Secure Download Mode is enabled, "
-                "autodetection will not work. Need to manually specify the chip."
+            # Only ESP32-S2 does not support chip id detection
+            # and supports secure download mode
+            inst = CHIP_DEFS["esp32s2"](
+                detect_port._port, baud, trace_enabled=trace_enabled
             )
+            si = inst.get_security_info()
+            inst.secure_download_mode = si["parsed_flags"]["SECURE_DOWNLOAD_ENABLE"]
+            inst = check_if_stub(inst)
+            inst._post_connect()
+            return inst
         except FatalError:
             log.print(" Autodetection failed, trying again...")
             detect_port.connect(
@@ -313,6 +327,34 @@ def dump_mem(
         return data.getvalue()
 
 
+def _get_flash_info(esp: ESPLoader, cache: bool = True) -> tuple[int, int, str | None]:
+    """
+    Get the flash memory chip information including vendor ID, device ID, and
+    flash size.
+
+    Args:
+        esp: Initiated esp object connected to a real device.
+        cache: Whether to use cached flash ID (default: True).
+
+    Returns:
+        Tuple containing (vendor_id, device_id, flash_size)
+    """
+    flash_id = esp.flash_id(cache=cache)
+    vendor_id = flash_id & 0xFF
+    # Swap the bytes of the device ID by taking the high byte first, then the low byte
+    device_id = ((flash_id >> 16) & 0xFF) | ((flash_id >> 8) & 0xFF) << 8
+
+    if vendor_id == ADESTO_VENDOR_ID:
+        # Lower 5 bits of second byte of flash_id is size_id
+        size_id = (flash_id >> 8) & 0x1F
+        flash_size = DETECTED_FLASH_SIZES_ADESTO.get(size_id)
+    else:
+        size_id = flash_id >> 16
+        flash_size = DETECTED_FLASH_SIZES.get(size_id)
+
+    return vendor_id, device_id, flash_size
+
+
 def detect_flash_size(esp: ESPLoader) -> str | None:
     """
     Detect the flash size of the connected ESP device.
@@ -328,9 +370,7 @@ def detect_flash_size(esp: ESPLoader) -> str | None:
             "Detecting flash size is not supported in secure download mode. "
             "Need to manually specify flash size."
         )
-    flash_id = esp.flash_id()
-    size_id = flash_id >> 16
-    flash_size = DETECTED_FLASH_SIZES.get(size_id)
+    _, _, flash_size = _get_flash_info(esp)
     return flash_size
 
 
@@ -667,7 +707,9 @@ def write_flash(
             )
 
     # Verify file sizes fit in the set flash_size, or real flash size if smaller
-    flash_end = min(set_flash_size, flash_end) if set_flash_size else flash_end
+    flash_end = (
+        min(set_flash_size, flash_end) if set_flash_size and flash_end else flash_end
+    )
     if flash_end is not None:
         for address, (data, name) in norm_addr_data:
             if address + len(data) > flash_end:
@@ -1016,20 +1058,14 @@ def attach_flash(
                 log.print("Enabling default SPI flash mode...")
             esp.flash_spi_attach(value)
 
-    # XMC chip startup sequence
-    XMC_VENDOR_ID = 0x20
-
     def is_xmc_chip_strict():
         # Read ID without cache, because it should be different after the XMC startup
-        id = esp.flash_id(cache=False)
-        rdid = ((id & 0xFF) << 16) | ((id >> 16) & 0xFF) | (id & 0xFF00)
-
-        vendor_id = (rdid >> 16) & 0xFF
-        mfid = (rdid >> 8) & 0xFF
-        cpid = rdid & 0xFF
-
+        vendor_id, device_id, _ = _get_flash_info(esp, False)
         if vendor_id != XMC_VENDOR_ID:
             return False
+
+        mfid = (device_id >> 8) & 0xFF
+        cpid = device_id & 0xFF
 
         matched = False
         if mfid == 0x40:
@@ -1079,7 +1115,7 @@ def attach_flash(
     if not esp.secure_download_mode:
         try:
             flash_id = esp.flash_id()
-            if flash_id in (0xFFFFFF, 0x000000):
+            if flash_id in (0xFFFFFF, 0x000000, 0xFFFF3F):
                 log.warning(
                     "Failed to communicate with the flash chip, "
                     "read/write operations will fail. "
@@ -1143,7 +1179,7 @@ def _set_flash_parameters(esp, flash_size="keep"):
         esp.flash_set_parameters(flash_size_bytes(flash_size))
         # Check if stub/ROM supports chosen flash size
         if (
-            not (esp.IS_STUB and esp.CHIP_NAME == "ESP32-S3")
+            not (esp.IS_STUB and esp.CHIP_NAME in ["ESP32-S3", "ESP32-P4"])
             and flash_size_bytes(flash_size) > 16 * 1024 * 1024
         ):
             log.note(
@@ -1243,13 +1279,10 @@ def print_flash_id(esp: ESPLoader) -> None:
     Args:
         esp: Initiated esp object connected to a real device.
     """
-    flash_id = esp.flash_id()
-    log.print(f"Manufacturer: {flash_id & 0xFF:02x}")
-    flid_lowbyte = (flash_id >> 16) & 0xFF
-    log.print(f"Device: {(flash_id >> 8) & 0xFF:02x}{flid_lowbyte:02x}")
-    log.print(
-        f"Detected flash size: {DETECTED_FLASH_SIZES.get(flid_lowbyte, 'Unknown')}"
-    )
+    manufacturer_id, device_id, flash_size = _get_flash_info(esp)
+    log.print(f"Manufacturer: {manufacturer_id:02x}")
+    log.print(f"Device: {device_id:04x}")
+    log.print(f"Detected flash size: {flash_size or 'Unknown'}")
 
 
 def flash_id(esp: ESPLoader) -> None:
@@ -1462,30 +1495,9 @@ def get_security_info(esp: ESPLoader) -> None:
     Args:
         esp: Initiated esp object connected to a real device.
     """
-    # The following mapping was taken from the ROM code
-    # This mapping is same across all targets in the ROM
-    SECURITY_INFO_FLAG_MAP = {
-        "SECURE_BOOT_EN": (1 << 0),
-        "SECURE_BOOT_AGGRESSIVE_REVOKE": (1 << 1),
-        "SECURE_DOWNLOAD_ENABLE": (1 << 2),
-        "SECURE_BOOT_KEY_REVOKE0": (1 << 3),
-        "SECURE_BOOT_KEY_REVOKE1": (1 << 4),
-        "SECURE_BOOT_KEY_REVOKE2": (1 << 5),
-        "SOFT_DIS_JTAG": (1 << 6),
-        "HARD_DIS_JTAG": (1 << 7),
-        "DIS_USB": (1 << 8),
-        "DIS_DOWNLOAD_DCACHE": (1 << 9),
-        "DIS_DOWNLOAD_ICACHE": (1 << 10),
-    }
-
-    # Get the status of respective security flag
-    def get_security_flag_status(flag_name, flags_value):
-        try:
-            return (flags_value & SECURITY_INFO_FLAG_MAP[flag_name]) != 0
-        except KeyError:
-            raise ValueError(f"Invalid flag name: {flag_name}")
-
     si = esp.get_security_info()
+    parsed_flags = si["parsed_flags"]
+
     title = "Security Information:"
     log.print(title)
     log.print("=" * len(title))
@@ -1504,11 +1516,9 @@ def get_security_info(esp: ESPLoader) -> None:
         log.print("Chip ID: {}".format(si["chip_id"]))
         log.print("API Version: {}".format(si["api_version"]))
 
-    flags = si["flags"]
-
-    if get_security_flag_status("SECURE_BOOT_EN", flags):
+    if parsed_flags["SECURE_BOOT_EN"]:
         log.print("Secure Boot: Enabled")
-        if get_security_flag_status("SECURE_BOOT_AGGRESSIVE_REVOKE", flags):
+        if parsed_flags["SECURE_BOOT_AGGRESSIVE_REVOKE"]:
             log.print("Secure Boot Aggressive key revocation: Enabled")
 
         revoked_keys = []
@@ -1519,7 +1529,7 @@ def get_security_info(esp: ESPLoader) -> None:
                 "SECURE_BOOT_KEY_REVOKE2",
             ]
         ):
-            if get_security_flag_status(key, flags):
+            if parsed_flags[key]:
                 revoked_keys.append(i)
 
         if len(revoked_keys) > 0:
@@ -1542,19 +1552,19 @@ def get_security_info(esp: ESPLoader) -> None:
 
     log.print(f"{CRYPT_CNT_STRING}: {si['flash_crypt_cnt']:#x}")
 
-    if get_security_flag_status("DIS_DOWNLOAD_DCACHE", flags):
+    if parsed_flags["DIS_DOWNLOAD_DCACHE"]:
         log.print("Dcache in UART download mode: Disabled")
 
-    if get_security_flag_status("DIS_DOWNLOAD_ICACHE", flags):
+    if parsed_flags["DIS_DOWNLOAD_ICACHE"]:
         log.print("Icache in UART download mode: Disabled")
 
-    hard_dis_jtag = get_security_flag_status("HARD_DIS_JTAG", flags)
-    soft_dis_jtag = get_security_flag_status("SOFT_DIS_JTAG", flags)
+    hard_dis_jtag = parsed_flags["HARD_DIS_JTAG"]
+    soft_dis_jtag = parsed_flags["SOFT_DIS_JTAG"]
     if hard_dis_jtag:
         log.print("JTAG: Permanently Disabled")
     elif soft_dis_jtag:
         log.print("JTAG: Software Access Disabled")
-    if get_security_flag_status("DIS_USB", flags):
+    if parsed_flags["DIS_USB"]:
         log.print("USB Access: Disabled")
 
 
@@ -1731,19 +1741,62 @@ def _parse_bootloader_info(bootloader_info_segment):
     }
 
 
-def image_info(input: ImageSource, chip: str | None = None) -> None:
+def image_info(
+    input: ImageSource | list[tuple[int, ImageSource]], chip: str | None = None
+) -> None:
     """
     Display detailed information about an ESP firmware image.
 
     Args:
         input: Path to the firmware image file, opened file-like object,
-            or the image data as bytes.
+            or the image data as bytes. If a list of tuples is provided,
+            each tuple contains an offset and an image data as bytes. Used for
+            merged binary images.
         chip: Target ESP device type (e.g., ``"esp32"``). If None, the chip
             type will be automatically detected from the image header.
     """
+    if isinstance(input, list):
+        log.print("Merged binary image detected. Processing each file individually.")
+        for i, file in enumerate(input):
+            data, _ = get_bytes(file[1])
 
-    data, _ = get_bytes(input)
-    log.print(f"Image size: {len(data)} bytes")
+            offset_str = hex(file[0]) if file[0] is not None else "unknown"
+            line = (
+                f"Processing file {i + 1}/{len(input)}, "
+                f"offset: {offset_str}, size: {len(data)} bytes"
+            )
+            log.print()
+            log.print("=" * len(line))
+            log.print(line)
+            log.print("=" * len(line))
+
+            try:
+                detected_chip = _parse_image_info_header(data, chip)
+            except Exception as e:
+                log.error(f"Error processing file {i + 1}/{len(input)}: {e}")
+                log.error("Probably not a valid firmware image (e.g. partition table).")
+                continue
+
+            if (
+                i == 0 and chip is None
+            ):  # We don't need to print the image type for each file
+                log.print(f"Detected image type: {detected_chip.upper()}")
+                chip = detected_chip
+            _print_image_info(detected_chip, data)
+
+    else:
+        data, _ = get_bytes(input)
+        detected_chip = _parse_image_info_header(data, chip)
+
+        log.print(f"Image size: {len(data)} bytes")
+        if chip is None:
+            log.print(f"Detected image type: {detected_chip.upper()}")
+
+        _print_image_info(detected_chip, data)
+
+
+def _parse_image_info_header(data: bytes, chip: str | None = None) -> str:
+    """Parse the image info header and return the chip type."""
     stream = io.BytesIO(data)
     common_header = stream.read(8)
     if chip is None:
@@ -1779,8 +1832,10 @@ def image_info(input: ImageSource, chip: str | None = None) -> None:
         except FatalError:
             chip = "esp8266"
 
-        log.print(f"Detected image type: {chip.upper()}")
+    return chip
 
+
+def _print_image_info(chip: str, data: bytes) -> None:
     image = LoadFirmwareImage(chip, data)
 
     log.print()

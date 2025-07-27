@@ -186,7 +186,7 @@ function compilePythonUtilities(isLegacyBuild = false, electronVersion = null) {
                 console.warn('\n⚠️  WARNING: Windows 7 Compatibility Issue ⚠️');
                 console.warn('You are building with Python ' + pythonVersion);
                 console.warn('Official Python versions 3.9 and above do not support Windows 7.');
-                console.warn('Also esptool dropped Python <3.10 support since commit d40fefa275dc4da28fdc747d2909a9ec29687ae8')
+                console.warn('Also esptool dropped Python <3.10 support since commit d40fefa275dc4da28fdc747d2909a9ec29687ae8 and since major version 5.0.0.')
                 console.warn('\nTo maintain Windows 7 compatibility, you need to:');
                 console.warn('1. Install Python 3.8 (last version with Windows 7 support)');
                 console.warn('2. Downgrade esptool to commit d40fefa275dc4da28fdc747d2909a9ec29687ae8');
