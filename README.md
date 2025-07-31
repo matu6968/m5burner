@@ -12,11 +12,16 @@ Due to Mac OS [enforcing code signing since Mac OS Sequoia](https://developer.ap
 or manually approve the app in Settings.
 
 To do this, open the app as usual until you see this message:
+
 <img width="372" height="344" alt="Image" src="https://github.com/user-attachments/assets/10017efc-d265-45bf-a91b-f41f6a6b00bd" />
+
 Then go to Settings --> Privacy and Security and scroll down until you see the m5burner app being listed as ""m5burner" was blocked to protect your Mac." like here below:
+
 <img width="372" height="344" alt="Image" src="https://eclecticlight.co/wp-content/uploads/2024/09/notarizn2.png" /> 
-Click on the Run Anyway button near it and confirm again (Mac OS really want's **to convince you to not run any unsigned apps**)
-<img width="372" height="344" alt="Image" src="https://eclecticlight.co/wp-content/uploads/2024/09/notarizn3.png" />
+
+Click on the Run Anyway button near it and confirm again (Mac OS really wants **to convince you to not run any unsigned apps**)
+
+<img width="372" height="880" alt="Image" src="https://eclecticlight.co/wp-content/uploads/2024/09/notarizn3.jpg" />
 
 After this, you should be able to open M5Burner.
 ## Compile instructions:
