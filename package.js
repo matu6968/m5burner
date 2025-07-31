@@ -16,6 +16,9 @@ const getPlatformConfig = () => {
             outputDir: `m5burner-${ARCH}.app`,
             electronBuildCmd: 'electron-builder --mac dmg --config electron-builder.config.js',
             needsResourcesCopy: true
+            console.warn("Warning, you are running Mac OS. Code signing is mandatory, otherwaise you will see a prompt saying this app cannot be ran due to not being verified.)
+            console.warn("To help fund a code signing certificate, please sponsor to the creator of this project to help afford a Apple Developer account at https://github.com/sponsors/matu6968".)
+            console.warn("For more details, see https://github.com/matu6968/m5burner/issues/36")
         };
     } else if (platform === 'win32') {
         return {

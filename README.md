@@ -3,10 +3,22 @@
 A utility used to flash [M5 Stack devices](https://m5stack.com/) with M5Stack's own firmware (some require an account to download them) or community firmware made by others.
 
 Changes in this version:
-- Newer Electron build (16.0.7 -> 36.0.1)
-- Newer version of [esptool.py](https://github.com/espressif/esptool) (4.7-dev -> 4.8.1)
+- Newer Electron build (16.0.7 -> 37.2.4)
+- Newer version of [esptool.py](https://github.com/espressif/esptool) (4.7-dev -> 5.0.1, on Mac OS it's 4.8.1)
 - Migrate to newer [node-usb](https://github.com/node-usb/node-usb) library from the legacy [node-usb-detection](https://github.com/MadLittleMods/node-usb-detection) and [node-usb-native](https://github.com/VSChina/serialport.node) libraries
 
+## Note for Mac OS users:
+Due to Mac OS [enforcing code signing since Mac OS Sequoia](https://developer.apple.com/news/?id=saqachfa) you will need to either build your own version yourself to skip this check (see Compile instructions below)
+or manually approve the app in Settings.
+
+To do this, open the app as usual until you see this message:
+<img width="372" height="344" alt="Image" src="https://github.com/user-attachments/assets/10017efc-d265-45bf-a91b-f41f6a6b00bd" />
+Then go to Settings --> Privacy and Security and scroll down until you see the m5burner app being listed as ""m5burner" was blocked to protect your Mac." like here below:
+<img width="372" height="344" alt="Image" src="https://eclecticlight.co/wp-content/uploads/2024/09/notarizn2.png" /> 
+Click on the Run Anyway button near it and confirm again (Mac OS really want's **to convince you to not run any unsigned apps**)
+<img width="372" height="344" alt="Image" src="https://eclecticlight.co/wp-content/uploads/2024/09/notarizn3.png" />
+
+After this, you should be able to open M5Burner.
 ## Compile instructions:
 
 1. Clone this repo (+ submodules) and install dependencies
