@@ -1,11 +1,12 @@
-Several other tools that are being used in M5Burner are 3rd party, it's license details are below:
+Several other tools that are being used in M5Burner are 3rd party, it's license notices have to be respected which are below:
 
 esptool.py and esptool (in deps/tool): GPL-2.0 (license: https://github.com/espressif/esptool/blob/master/LICENSE)
 nvs_partition_gen: Apache-2.0 (license: https://github.com/espressif/esp-idf-nvs-partition-gen/blob/main/LICENSE)
 intelhex (in deps/tool): BSD-3-Clause (license: https://github.com/python-intelhex/intelhex/blob/master/LICENSE.txt)
 serial: (in deps/tool): BSD-3-Clause (license: https://github.com/pyserial/pyserial/blob/master/LICENSE.txt)
 kflash.py (in deps/tool): MIT (license: https://github.com/kendryte/kflash.py/blob/master/LICENSE)
+gen_esp32part.py (in deps/tool): Apache-2.0 (license: https://github.com/espressif/esp-idf/blob/master/LICENSE)
 
 The following files that are still proprietary to M5Stack but yet to be reverse engineered:
 deps/tool/esp32_board_identify.bin (M5Stack HW detection)
-all files in deps/view (main UI that displays when you launch M5Burner, is a Angular based app)
+all files in deps/view (excluding any third party libraries used in the UI that are licensed under open source licenses - see deps/view/3rdpartylicenses.txt for details, main UI that displays when you launch M5Burner which is a Angular based app)
