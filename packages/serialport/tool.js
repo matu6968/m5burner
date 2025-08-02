@@ -17,6 +17,9 @@ const PluginTypes = require('../pluginType')
 const { useWifiPacker } = require('../plugin/uiflow-wifi-packer')
 const { useTimerCamPacker } = require('../plugin/timercam-cfg-packer')
 const { useUIFlow2NVS, mixinUIFlow2NVS} = require('../plugin/uiflow2-nvs-config')
+const { mixinOpenaiNVS } = require('../plugin/openai-nvs-config')
+const { mixinOpenaiCamNVS } = require('../plugin/openai-cams3-nvs-config')
+const { mixinStamplcNVS } = require('../plugin/stamplc-nvs-config')
 const serial = require('./serial')
 
 const size2address = {
@@ -182,6 +185,15 @@ function burn(opts, send) {
       let cfg = useUIFlow2NVS({...args})
       addr = cfg[0]
       binFile = cfg[1]
+    }
+    else if(opts.payload.pluginType === PluginTypes.OPENAI_KEY_CFG) {
+      binFile = mixinOpenaiNVS({...args, rawBin: binFile})[1]
+    }
+    else if(opts.payload.pluginType === PluginTypes.OPENAI_CAM_CFG) {
+      binFile = mixinOpenaiCamNVS({...args, rawBin: binFile})[1]
+    }
+    else if(opts.payload.pluginType === PluginTypes.STAMPLC_CFG) {
+      binFile = mixinStamplcNVS({...args, rawBin: binFile})[1]
     }
   }
 

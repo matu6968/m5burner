@@ -56,6 +56,19 @@ boot_option,data,u8,<from_0_to_2>
 ```
 After the official client makes the CSV file, it gets compiled into a NVS binary with the NVS partition size being 24576 (aka around 24 KB).
 
+For StamPLC version of UIFlow2, the CSV file structure is the same as the UIFlow2 configuration files, but instead you fill out the UIFlow2 username and password along with the typical WiFi SSID and password fields.
+
+It looks like this:
+```csv
+key,type,encoding,value
+uiflow,namespace,,
+ssid,data,string,<wifi_ssid>
+pswd,data,string,<wifi_password>
+ufusr,data,string,<ufusr>
+ufpswd,data,string,<ufpswd>
+
+```
+
 To make a configuration in the Python based reimplementation of the algorithm:
 
 - 1. Make a JSON file as config.json (or any file name) with the content:
@@ -74,16 +87,31 @@ To make a configuration in the Python based reimplementation of the algorithm:
     "bootOpt": 1
 }
 ```
-- Note: Replace the example credentials for WiFi SSID and password (along with the server and NTP server URL fields if needed and remove any other SSID fields if not needed) with the actual credentials of your WiFi network along with your timezone if it is different.
 
-Also change the bootOpt value to a different number if needed based on this syntax:
+or for StamPLC version of UIFlow2:
+```json
+{
+    "ssid": "MyNetwork",
+    "pswd": "MyPassword",
+    "ufusr": "MyUsername",
+    "ufpswd": "MyPassword"
+}
+```
+- Note: Replace the example credentials for WiFi SSID and password (along with the server and NTP server URL fields if needed and remove any other SSID fields if not needed) with the actual credentials of your WiFi network along with your timezone if it is different. 
+For StamPLC version of UIFlow2, addionally replace the example credentials for UIFlow2 username and password with the actual credentials of your UIFlow2 username and password.
+
+Also change the bootOpt value to a different number if needed based on this syntax (only for non-StamPLC version of UIFlow2):
 - 0 - Run main.py directly, 
 - 1 - Show startup menu and network setup, 
 - 2 - Only show network setup
 
 - 2. Execute the config generator script with the following arguments:
 ```bash
-python3 main.py --config-type uiflow2_nv --input config.json --output uiflow.cfg # replace config.json with different name if your filename is different
+python3 main.py --config-type uiflow2_nvs --input config.json --output uiflow.cfg # replace config.json with different name if your filename is different
+```
+# or for StamPLC version of UIFlow2:
+```bash
+python3 main.py --config-type stamplc_nvs --input config.json --output uiflow-stamplc.cfg # replace config.json with different name if your filename is different
 ```
 - Note: you will need to put the script in the root of nvs_partition_gen utiltites to use it (or modify the script to use a compiled version of nvs_partition_gen compiled using PyInstaller)
 - If you decide to use the compiled version of nvs_partition_gen that has the file name as `nvs_partition_gen`, put the compiled version in the root of the script and replace the line in definition `create_uiflow2_nvs_config` from:
@@ -229,6 +257,59 @@ python3 main.py --config-type timercam_smb --input config.json --output timercam
 # for TimerCam Aliyun OSS (Object Storage Service) configuration
 python3 main.py --config-type timercam_aliyun --input config.json --output timercam-aliyun.cfg # replace config.json with different name if your filename is different
 ```
+
+# 4. OpenAI configuration files (voice assistant/vision assistant):
+
+The way to make them are mostly the same as the UIFlow2 configuration files, but instead you fill out the OpenAI API key and the language code.
+
+- CSV file structure that starts with `key,type,encoding,value` and `config,namespace,,` which then has these fields (with the headers):
+```csv
+key,type,encoding,value
+config,namespace,,
+wifi_ssid,data,string,<wifi_ssid>
+wifi_password,data,string,<wifi_password>
+openaikey,data,string,<openai_key>
+language,data,string,<language_code> (vision assistant only)
+```
+
+To make a configuration in the Python based reimplementation of the algorithm:
+
+- 1. Make a JSON file as config.json (or any file name) with the content based on the type of assistant you want to make:
+    - OpenAI voice assistant:
+    ```json
+    {
+        "wifi_ssid": "MyNetwork",
+        "wifi_password": "MyPassword",
+        "openai_key": "sk-your-openai-api-key-here"
+    }
+    ```
+    - OpenAI Vision voice assistant:
+    ```json
+    {
+        "wifi_ssid": "MyNetwork",
+        "wifi_password": "MyPassword",
+        "openai_key": "sk-your-openai-api-key-here",
+        "language": "en"
+    }
+    ```
+- Note: Replace the example credentials for WiFi SSID, password and OpenAI API keys with the actual credentials of your WiFi network along with your OpenAI API key. Accepted language codes for the `language` field are in a table:
+```
+- Language codes:
+    en: English
+    zh: Chinese
+    ja: Japanese
+```
+
+- 2. Execute the config generator script with the following arguments for the following variants:
+```bash
+# for OpenAI voice assistant configuration
+python3 main.py --config-type openai_nvs --input config.json --output openai.cfg # replace config.json with different name if your filename is different
+```
+```bash
+# for OpenAI Vision voice assistant configuration
+python3 main.py --config-type openai_vision_nvs --input config.json --output openai-vision.cfg # replace config.json with different name if your filename is different
+```
+
 
 # Programatic usage
 You can use the API's provided within this program to integrate it directly in your Python program, a sample usage of the API functions is provided as m5burner-plugin-api-sample.py. 

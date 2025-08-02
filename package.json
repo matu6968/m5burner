@@ -1,18 +1,19 @@
 {
   "name": "m5burner",
-  "version": "3.1.1",
+  "version": "3.1.2",
+  "license": "MIT",
   "homepage": "https://docs.m5stack.com/en/download",
   "description": "M5Stack Flash Tool",
   "main": "app.js",
   "author": "M5Stack",
   "dependencies": {
     "@electron/rebuild": "^4.0.1",
-    "@electron/remote": "^2.1.2",
+    "@electron/remote": "^2.1.3",
     "@serialport/bindings-cpp": "^13.0.1",
-    "axios": "^1.7.9",
+    "axios": "^1.11.0",
     "serialport": "^13.0.0",
     "unzipper": "^0.12.3",
-    "usb": "^2.14.0"
+    "usb": "^2.16.0"
   },
   "devDependencies": {
     "electron": "37.2.5",
@@ -29,7 +30,7 @@
     "test": "electron app.js",
     "create-update": "node scripts/create-update-package.js",
     "update-esptool": "cd deps-updaters && node esptool-update.js",
-    "rebuild-native-modules-arm": "VER=37.2.4 cd node_modules/usb && node-gyp rebuild --target=$VER --arch=arm --dist-url=https://electronjs.org/headers && cd ../serialport/node_modules/@serialport/bindings-cpp && node-gyp rebuild --target=$VER --arch=arm --dist-url=https://electronjs.org/headers && cd ../../../../@serialport/bindings-cpp && node-gyp rebuild --target=$VER --arch=arm --dist-url=https://electronjs.org/headers"
+    "rebuild-native-modules-arm": "VER=37.2.5 cd node_modules/usb && node-gyp rebuild --target=$VER --arch=arm --dist-url=https://electronjs.org/headers && cd ../serialport/node_modules/@serialport/bindings-cpp && node-gyp rebuild --target=$VER --arch=arm --dist-url=https://electronjs.org/headers && cd ../../../../@serialport/bindings-cpp && node-gyp rebuild --target=$VER --arch=arm --dist-url=https://electronjs.org/headers"
   },
   "build": {
     "appId": "com.m5stack.m5burner",

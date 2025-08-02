@@ -126,5 +126,33 @@ def main():
     except Exception as e:
         print(f"Error reading UIFlow config: {e}")
 
+    # Example 10: Create OpenAI NVS Configuration
+    openai_config = {
+        'wifi_ssid': 'MyWiFi',
+        'wifi_password': 'MyPassword',
+        'openai_key': 'sk-your-openai-api-key-here'
+    }
+    addr, path = config_gen.create_openai_nvs_config(openai_config, "output/openai.bin")
+    print(f"OpenAI NVS config created at: {path} (address: {addr})")
+
+    # Example 11: Create OpenAI Vision NVS Configuration
+    openai_vision_config = {
+        'wifi_ssid': 'MyWiFi',
+        'wifi_password': 'MyPassword',
+        'openai_key': 'sk-your-openai-api-key-here',
+        'language': 'en'
+    }
+    addr, path = config_gen.create_openai_vision_nvs_config(openai_vision_config, "output/openai-vision.bin")
+    print(f"OpenAI Vision NVS config created at: {path} (address: {addr})")
+
+    # Example 12: Create StamPLC NVS Configuration
+    stamplc_config = {
+        'wifi_ssid': 'MyWiFi',
+        'wifi_password': 'MyPassword',
+        'ufusr': 'MyUsername',
+        'ufpswd': 'MyPassword'
+    }
+    addr, path = config_gen.create_stamplc_nvs_config(stamplc_config, "output/stamplc.bin")
+    print(f"Stamplc NVS config created at: {path} (address: {addr})")
 if __name__ == "__main__":
     main()

@@ -86,6 +86,11 @@ app.on('ready', async () => {
 
   Menu.setApplicationMenu(null)
 
+  // Send version info to renderer process when DOM is ready
+  mainWin.webContents.on('dom-ready', () => {
+    mainWin.webContents.send('get-version', updateInfo.version)
+  })
+
   if(environment.isDev()) {
     // Debug
     await mainWin.loadURL('http://localhost:4500')

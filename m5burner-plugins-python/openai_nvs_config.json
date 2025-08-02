@@ -1,0 +1,5 @@
+{
+  "ssid": "MyNetwork",
+  "password": "MyPassword",
+  "openai_key": "sk-MyOpenAIAPIKey-here"
+} 

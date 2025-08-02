@@ -9,11 +9,11 @@ const IPC_EVENT = require('./ipcEvent')
 const wm = require('./windowManager')
 
 // Old base URLs for version info and patch update.
-//const ONLINE_VERSION_URL = 'http://m5burner-cdn.m5stack.com/appVersion.info'
+const ONLINE_VERSION_URL = 'http://m5burner-cdn.m5stack.com/appVersion.info'
 //const APP_PATCH_URL = 'http://m5burner-cdn.m5stack.com/patch'
 
 // Base URLs for version info and patch update.
-const ONLINE_VERSION_URL = 'http://m5burner.originui.dev/appVersion.info'
+//const ONLINE_VERSION_URL = 'http://m5burner.originui.dev/appVersion.info'
 const APP_PATCH_URL = 'http://m5burner.originui.dev/patch'
 
 

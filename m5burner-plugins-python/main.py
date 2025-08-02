@@ -177,7 +177,8 @@ boot_option,data,u8,{config['bootOpt']}"""
         nvs_path = self.tmp_dir / 'uiflow2-nvs.bin'
         
         # Generate NVS partition
-        subprocess.run(['python', 'nvs_partition_gen.py', 'generate', 
+        nvs_gen_path = Path(__file__).parent.parent / 'esp-idf-nvs-partition-gen' / 'esp_idf_nvs_partition_gen' / 'nvs_partition_gen.py'
+        subprocess.run(['python', str(nvs_gen_path), 'generate', 
                        str(csv_path), str(nvs_path), '0x6000'])
 
         # If firmware path is provided, create combined image
@@ -412,13 +413,307 @@ boot_option,data,u8,{config['bootOpt']}"""
             "wifi_ssid": ssid,
             "wifi_password": password
         }
+    def create_openai_nvs_config(self, config, output_path=None, firmware_path=None):
+        """Create OpenAI voice assistant NVS configuration file
+        
+        Args:
+            config: Configuration dictionary with WiFi and OpenAI API key
+            output_path: Path for output file
+            firmware_path: Optional path to OpenAI voice assistant firmware to create combined image
+        
+        Required fields:
+        - ssid: WiFi SSID (1-32 characters)
+        - password: WiFi password (8-63 characters)
+        - openai_key: OpenAI API key
+        
+        Returns:
+            tuple: (address, output_path)
+        """
+        # Validate required fields
+        required_fields = ['ssid', 'password', 'openai_key']
+        missing = [f for f in required_fields if f not in config]
+        if missing:
+            raise ValueError(f"Missing required fields for OpenAI config: {', '.join(missing)}")
+
+        # Validate WiFi credentials
+        ssid = config['ssid']
+        password = config['password']
+        if len(ssid) > 32:
+            raise ValueError("WiFi SSID cannot be longer than 32 characters")
+        if len(ssid) < 1:
+            raise ValueError("WiFi SSID cannot be empty")
+        if len(password) < 8:
+            raise ValueError("WiFi password must be at least 8 characters")
+        if len(password) > 63:
+            raise ValueError("WiFi password cannot be longer than 63 characters")
+
+        # Create CSV content for OpenAI voice assistant
+        csv_content = f"""key,type,encoding,value
+config,namespace,,
+wifi_ssid,data,string,{ssid}
+wifi_password,data,string,{password}
+openaikey,data,string,{config['openai_key']}"""
+
+        # Write CSV file
+        csv_path = self.tmp_dir / 'openai.csv'
+        with open(csv_path, 'w') as f:
+            f.write(csv_content)
+
+        # Set output path for NVS binary
+        nvs_path = self.tmp_dir / 'openai-nvs.bin'
+        
+        # Generate NVS partition
+        nvs_gen_path = Path(__file__).parent.parent / 'esp-idf-nvs-partition-gen' / 'esp_idf_nvs_partition_gen' / 'nvs_partition_gen.py'
+        subprocess.run(['python', str(nvs_gen_path), 'generate', 
+                       str(csv_path), str(nvs_path), '0x6000'])
+
+        # If firmware path is provided, create combined image
+        if firmware_path:
+            if not os.path.exists(firmware_path):
+                raise ValueError(f"OpenAI firmware file not found: {firmware_path}")
+
+            if output_path is None:
+                output_path = self.tmp_dir / 'openai-combined.bin'
+            
+            # Read the firmware
+            with open(firmware_path, 'rb') as f:
+                firmware_data = f.read()
+            
+            # Read the NVS partition
+            with open(nvs_path, 'rb') as f:
+                nvs_data = f.read()
+            
+            # Create combined image:
+            # - Original firmware up to NVS offset (0x9000)
+            # - NVS partition (0x6000 bytes)
+            # - Remaining firmware data
+            nvs_offset = 0x9000
+            nvs_size = 0x6000
+            
+            combined = (
+                firmware_data[:nvs_offset] +  # Data before NVS
+                nvs_data +                    # NVS partition
+                firmware_data[nvs_offset + nvs_size:]  # Data after NVS
+            )
+            
+            # Write combined image
+            with open(output_path, 'wb') as f:
+                f.write(combined)
+            
+            return "0x0000", str(output_path)
+        else:
+            # If no firmware provided, just return the NVS partition
+            if output_path:
+                os.rename(nvs_path, output_path)
+            else:
+                output_path = nvs_path
+            
+            return "0x9000", str(output_path)
+    def create_openai_vision_nvs_config(self, config, output_path=None, firmware_path=None):
+        """Create OpenAI Vision voice assistant NVS configuration file
+        
+        Args:
+            config: Configuration dictionary with WiFi and OpenAI API key
+            output_path: Path for output file
+            firmware_path: Optional path to OpenAI Vision voice assistant firmware to create combined image
+        
+        Required fields:
+        - ssid: WiFi SSID (1-32 characters)
+        - password: WiFi password (8-63 characters)
+        - openai_key: OpenAI API key
+        - language: Language code (e.g., 'en', 'zh', 'ja')
+        
+        Returns:
+            tuple: (address, output_path)
+        """
+        # Validate required fields
+        required_fields = ['ssid', 'password', 'openai_key', 'language']
+        missing = [f for f in required_fields if f not in config]
+        if missing:
+            raise ValueError(f"Missing required fields for OpenAI Vision config: {', '.join(missing)}")
+
+        # Validate WiFi credentials
+        ssid = config['ssid']
+        password = config['password']
+        if len(ssid) > 32:
+            raise ValueError("WiFi SSID cannot be longer than 32 characters")
+        if len(ssid) < 1:
+            raise ValueError("WiFi SSID cannot be empty")
+        if len(password) < 8:
+            raise ValueError("WiFi password must be at least 8 characters")
+        if len(password) > 63:
+            raise ValueError("WiFi password cannot be longer than 63 characters")
+
+        # Create CSV content for OpenAI Vision voice assistant
+        csv_content = f"""key,type,encoding,value
+config,namespace,,
+wifi_ssid,data,string,{ssid}
+wifi_password,data,string,{password}
+openaikey,data,string,{config['openai_key']}
+language,data,string,{config['language']}"""
+
+        # Write CSV file
+        csv_path = self.tmp_dir / 'openai-vision.csv'
+        with open(csv_path, 'w') as f:
+            f.write(csv_content)
+
+        # Set output path for NVS binary
+        nvs_path = self.tmp_dir / 'openai-vision-nvs.bin'
+        
+        # Generate NVS partition
+        nvs_gen_path = Path(__file__).parent.parent / 'esp-idf-nvs-partition-gen' / 'esp_idf_nvs_partition_gen' / 'nvs_partition_gen.py'
+        subprocess.run(['python', str(nvs_gen_path), 'generate', 
+                       str(csv_path), str(nvs_path), '0x6000'])
+
+        # If firmware path is provided, create combined image
+        if firmware_path:
+            if not os.path.exists(firmware_path):
+                raise ValueError(f"OpenAI Vision firmware file not found: {firmware_path}")
+
+            if output_path is None:
+                output_path = self.tmp_dir / 'openai-vision-combined.bin'
+            
+            # Read the firmware
+            with open(firmware_path, 'rb') as f:
+                firmware_data = f.read()
+            
+            # Read the NVS partition
+            with open(nvs_path, 'rb') as f:
+                nvs_data = f.read()
+            
+            # Create combined image:
+            # - Original firmware up to NVS offset (0x9000)
+            # - NVS partition (0x6000 bytes)
+            # - Remaining firmware data
+            nvs_offset = 0x9000
+            nvs_size = 0x6000
+            
+            combined = (
+                firmware_data[:nvs_offset] +  # Data before NVS
+                nvs_data +                    # NVS partition
+                firmware_data[nvs_offset + nvs_size:]  # Data after NVS
+            )
+            
+            # Write combined image
+            with open(output_path, 'wb') as f:
+                f.write(combined)
+            
+            return "0x0000", str(output_path)
+        else:
+            # If no firmware provided, just return the NVS partition
+            if output_path:
+                os.rename(nvs_path, output_path)
+            else:
+                output_path = nvs_path
+            
+            return "0x9000", str(output_path)
+
+    def create_stamplc_nvs_config(self, config, output_path=None, firmware_path=None):
+        """Create StamPLC NVS configuration file
+        
+        Args:
+            config: Configuration dictionary with WiFi and UIFlow credentials
+            output_path: Path for output file
+            firmware_path: Optional path to StamPLC firmware to create combined image
+        
+        Required fields:
+        - ssid: WiFi SSID (1-32 characters)
+        - pwd: WiFi password (8-63 characters)
+        - ufusr: UIFlow username
+        - ufpswd: UIFlow password
+        
+        Returns:
+            tuple: (address, output_path)
+        """
+        # Validate required fields
+        required_fields = ['ssid', 'pwd', 'ufusr', 'ufpswd']
+        missing = [f for f in required_fields if f not in config]
+        if missing:
+            raise ValueError(f"Missing required fields for StamPLC config: {', '.join(missing)}")
+
+        # Validate WiFi credentials
+        ssid = config['ssid']
+        password = config['pwd']
+        if len(ssid) > 32:
+            raise ValueError("WiFi SSID cannot be longer than 32 characters")
+        if len(ssid) < 1:
+            raise ValueError("WiFi SSID cannot be empty")
+        if len(password) < 8:
+            raise ValueError("WiFi password must be at least 8 characters")
+        if len(password) > 63:
+            raise ValueError("WiFi password cannot be longer than 63 characters")
+
+        # Create CSV content for StamPLC
+        csv_content = f"""key,type,encoding,value
+uiflow,namespace,,
+ssid,data,string,{ssid}
+pswd,data,string,{password}
+ufusr,data,string,{config['ufusr']}
+ufpswd,data,string,{config['ufpswd']}"""
+
+        # Write CSV file
+        csv_path = self.tmp_dir / 'stamplc.csv'
+        with open(csv_path, 'w') as f:
+            f.write(csv_content)
+
+        # Set output path for NVS binary
+        nvs_path = self.tmp_dir / 'stamplc-nvs.bin'
+        
+        # Generate NVS partition
+        nvs_gen_path = Path(__file__).parent.parent / 'esp-idf-nvs-partition-gen' / 'esp_idf_nvs_partition_gen' / 'nvs_partition_gen.py'
+        subprocess.run(['python', str(nvs_gen_path), 'generate', 
+                       str(csv_path), str(nvs_path), '0x6000'])
+
+        # If firmware path is provided, create combined image
+        if firmware_path:
+            if not os.path.exists(firmware_path):
+                raise ValueError(f"StamPLC firmware file not found: {firmware_path}")
+
+            if output_path is None:
+                output_path = self.tmp_dir / 'stamplc-combined.bin'
+            
+            # Read the firmware
+            with open(firmware_path, 'rb') as f:
+                firmware_data = f.read()
+            
+            # Read the NVS partition
+            with open(nvs_path, 'rb') as f:
+                nvs_data = f.read()
+            
+            # Create combined image:
+            # - Original firmware up to NVS offset (0x9000)
+            # - NVS partition (0x6000 bytes)
+            # - Remaining firmware data
+            nvs_offset = 0x9000
+            nvs_size = 0x6000
+            
+            combined = (
+                firmware_data[:nvs_offset] +  # Data before NVS
+                nvs_data +                    # NVS partition
+                firmware_data[nvs_offset + nvs_size:]  # Data after NVS
+            )
+            
+            # Write combined image
+            with open(output_path, 'wb') as f:
+                f.write(combined)
+            
+            return "0x0000", str(output_path)
+        else:
+            # If no firmware provided, just return the NVS partition
+            if output_path:
+                os.rename(nvs_path, output_path)
+            else:
+                output_path = nvs_path
+            
+            return "0x9000", str(output_path)
 
 def main():
     parser = argparse.ArgumentParser(description='M5Stack Configuration Generator')
     parser.add_argument('--config-type', required=True, 
                        choices=['uiflow', 'uiflow_read', 'wifi', 'uiflow2_nvs', 
                                'timercam', 'timercam_smb', 'timercam_s3', 
-                               'timercam_rtsp', 'timercam_aliyun'],
+                               'timercam_rtsp', 'timercam_aliyun',
+                               'openai_nvs', 'openai_vision_nvs', 'stamplc_nvs'],
                        help='Type of configuration operation')
     parser.add_argument('--input', required=True, 
                        help='Input file (JSON for config generation, binary for reading)')
@@ -492,6 +787,34 @@ def main():
             config['mode'] = mode_mapping[args.config_type]
             addr, path = config_gen.create_timercam_config(config, args.output)
             print(f"TimerCam config created at: {path} (address: {addr})")
+            return
+
+        # Handle OpenAI configurations
+        elif args.config_type == 'openai_nvs':
+            addr, path = config_gen.create_openai_nvs_config(
+                config, 
+                args.output,
+                firmware_path=args.firmware
+            )
+            print(f"OpenAI {'combined image' if args.firmware else 'NVS config'} created at: {path} (address: {addr})")
+            return
+
+        elif args.config_type == 'openai_vision_nvs':
+            addr, path = config_gen.create_openai_vision_nvs_config(
+                config, 
+                args.output,
+                firmware_path=args.firmware
+            )
+            print(f"OpenAI Vision {'combined image' if args.firmware else 'NVS config'} created at: {path} (address: {addr})")
+            return
+
+        elif args.config_type == 'stamplc_nvs':
+            addr, path = config_gen.create_stamplc_nvs_config(
+                config, 
+                args.output,
+                firmware_path=args.firmware
+            )
+            print(f"StamPLC {'combined image' if args.firmware else 'NVS config'} created at: {path} (address: {addr})")
             return
 
         # Handle other config types...

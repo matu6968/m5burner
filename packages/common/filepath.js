@@ -8,8 +8,9 @@ let TOOL_DIR = ''
 const sysDir = os.platform() === 'win32' ? 'windows' : (os.platform() === 'darwin' ? 'macos' : 'linux')
 
 if(environment.isDev()) {
-  prefix = path.resolve(__dirname, '..', '..', '..', 'debug')
-  TOOL_DIR = path.resolve(prefix, '..', 'resource', sysDir)
+  // In development mode, look for files in the current project structure
+  prefix = path.resolve(__dirname, '..', '..', 'm5burner-x64')
+  TOOL_DIR = path.resolve(prefix, 'packages', 'tool')
 } else {
   if(os.platform() === 'darwin') {
     prefix = path.resolve(__dirname, '..', '..', '..', 'packages')
@@ -39,7 +40,7 @@ const NVS_EXE = path.resolve(TOOL_DIR, 'nvs.exe')
 const NVS_PY = path.resolve(TOOL_DIR, 'nvs')
 const NVS_BIN = path.resolve(TOOL_DIR, 'burner_nvs.bin')
 const IDENTIFY_BIN = path.resolve(TOOL_DIR, 'esp32_board_identify.bin')
-const VERSION_INFO = path.resolve(prefix, 'appVersion.info')
+const VERSION_INFO = path.resolve(prefix, 'packages', 'appVersion.info')
 
 module.exports = {
   ROOT_DIR,
