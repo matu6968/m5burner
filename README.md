@@ -2,6 +2,11 @@
 
 A utility used to flash [M5 Stack devices](https://m5stack.com/) with M5Stack's own firmware (some require an account to download them) or community firmware made by others.
 
+> [!WARNING]
+> Project no longer maintained due to the fact I no longer own any M5Stack devices to test this on and due to losing interest in maintaining this project.
+> 
+> In the future a native version (without Electron) could be done, but for now it is out of scope of the maintainer (would be only me)
+
 Changes in this version:
 - Newer Electron build (16.0.7 -> 37.2.4)
 - Newer version of [esptool.py](https://github.com/espressif/esptool) (4.7-dev -> 5.0.1, on Mac OS it's 4.8.1)
